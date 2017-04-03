@@ -7,3 +7,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - 3000
+  caddy:
+    image: abiosoft/caddy
+    volumes:
+      - ./Caddyfile:/etc/Caddyfile
+      - ./assets:/srv/assets
+    links:
+      - cover.run:cover.run
+    ports:
+      - 2015:2015
