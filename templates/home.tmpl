@@ -1,6 +1,4 @@
 {{define "breadcrumb"}}
-<li><a href="/">go</a> <span class="divider">/</span></li>
-<li class="active">{{.Repo}}</li>
 {{end}}
 
 {{define "content"}}
@@ -22,7 +20,7 @@ $(document).ready(function () {
   });
 });
 </script>
-<form class="form-horizontal" role="form">
+<form class="form-horizontal" method="POST" role="form">
 <div class="jumbotron">
      <p>See code coverage.</p>
      <div class="input-group input-group-lg">
