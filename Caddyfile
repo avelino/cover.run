@@ -1,0 +1,9 @@
+0.0.0.0
+
+proxy / cover.run:3000 {
+      except /assets
+}
+
+log stdout
+
+errors stdout

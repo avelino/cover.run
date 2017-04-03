@@ -15,4 +15,4 @@ services:
     links:
       - cover.run:cover.run
     ports:
-      - 2015:2015
+      - 80:2015
