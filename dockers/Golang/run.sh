@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-go get -d -t $1 2> /dev/null
+go get -d -t $1
 cd /go/src/$1
 
 number=`go test -covermode=count -coverprofile=coverage.out | grep coverage | cut -d ' ' -f 2`
