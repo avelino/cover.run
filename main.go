@@ -25,8 +25,9 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	Body["Repo"] = vars["repo"]
 	StdOut, StdErr := run("dockers/Golang", "Dockerfile", vars["repo"])
-	if StdOut != "" {
-		Body["Cover"] = StdOut
+	stdOut := strings.Trim(StdOut, " \n")
+	if stdOut != "" {
+		Body["Cover"] = stdOut
 	} else {
 		Body["Cover"] = StdErr
 	}
