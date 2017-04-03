@@ -1,0 +1,2 @@
+# cover.run
+Code coverage
