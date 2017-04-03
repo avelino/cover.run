@@ -1,0 +1,36 @@
+{{define "breadcrumb"}}
+<li><a href="/">go</a> <span class="divider">/</span></li>
+<li class="active">{{.Repo}}</li>
+{{end}}
+
+{{define "content"}}
+<script>
+function actionForm(repo) {
+  url = "/go/" + repo
+  $("form").attr("action", url);
+  return url
+};
+$(document).ready(function () {
+  $("#repo").keypress(function(){
+    actionForm($("#repo").val());
+  });
+  $("button").click(function() {
+    actionForm($("#repo").val());
+  });
+  $("form").submit(function(){
+    actionForm($("#repo").val());
+  });
+});
+</script>
+<form class="form-horizontal" role="form">
+<div class="jumbotron">
+     <p>See code coverage.</p>
+     <div class="input-group input-group-lg">
+     	  <input type="text" class="form-control" placeholder="repository address, e.g. github.com/user/project" id="repo" name="repo">
+	  <span class="input-group-btn">
+	  	<button class="btn btn-info" type="submit"><span class="glyphicon glyphicon-wrench"></span> Run</button>
+	  </span>
+     </div>
+</div>
+</form>
+{{end}}
