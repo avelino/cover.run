@@ -29,7 +29,7 @@ func main2() {
 	run("dockers/Golang", "Dockerfile", *repo)
 }
 
-func HandlerRepo(w http.ResponseWriter, r *http.Request) {
+func repoCover(repo string) (obj Object) {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": "redis:6379",
@@ -45,34 +45,33 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 			return msgpack.Unmarshal(b, v)
 		},
 	}
-	Body := map[string]interface{}{}
-	vars := mux.Vars(r)
-	key := vars["repo"]
-	Body["Repo"] = key
-	var obj Object
-	if err := codec.Get(key, &obj); err != nil {
-		StdOut, StdErr := run("dockers/Golang", "Dockerfile", key)
+	if err := codec.Get(repo, &obj); err != nil {
+		StdOut, StdErr := run("dockers/Golang", "Dockerfile", repo)
 		stdOut := strings.Trim(StdOut, " \n")
-		var Cover string
 		if stdOut != "" {
-			Cover = stdOut
+			obj.Cover = stdOut
 		} else {
-			Cover = StdErr
+			obj.Cover = StdErr
 		}
-		Body["Cover"] = Cover
-
 		obj := &Object{
-			Cover: Cover,
+			Cover: obj.Cover,
 		}
 		codec.Set(&cache.Item{
-			Key:        key,
+			Key:        repo,
 			Object:     obj,
 			Expiration: time.Hour,
 		})
-	} else {
-		Body["Cover"] = obj.Cover
 	}
+	return
+}
 
+func HandlerRepo(w http.ResponseWriter, r *http.Request) {
+	Body := map[string]interface{}{}
+	vars := mux.Vars(r)
+	repo := vars["repo"]
+	Body["Repo"] = repo
+	obj := repoCover(repo)
+	Body["Cover"] = obj.Cover
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	t.Execute(w, Body)
 	return
