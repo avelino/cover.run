@@ -3,10 +3,14 @@ services:
   cover.run:
     privileged: true
     build: .
+    links:
+      - redis:redis
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - 3000
+  redis:
+    image: redis
   caddy:
     image: abiosoft/caddy
     volumes:
@@ -15,4 +19,4 @@ services:
     links:
       - cover.run:cover.run
     ports:
-      - 80:2015
+      - 2015:2015

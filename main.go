@@ -7,12 +7,21 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/go-redis/cache"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/nuveo/gofn"
 	"github.com/nuveo/gofn/provision"
 	"github.com/urfave/negroni"
 )
+
+type Object struct {
+	Cover string
+}
 
 func main2() {
 	repo := flag.String("repo", "", "a string")
@@ -21,15 +30,47 @@ func main2() {
 }
 
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server1": "redis:6379",
+		},
+	})
+	codec := &cache.Codec{
+		Redis: ring,
+
+		Marshal: func(v interface{}) ([]byte, error) {
+			return msgpack.Marshal(v)
+		},
+		Unmarshal: func(b []byte, v interface{}) error {
+			return msgpack.Unmarshal(b, v)
+		},
+	}
 	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
-	Body["Repo"] = vars["repo"]
-	StdOut, StdErr := run("dockers/Golang", "Dockerfile", vars["repo"])
-	stdOut := strings.Trim(StdOut, " \n")
-	if stdOut != "" {
-		Body["Cover"] = stdOut
+	key := vars["repo"]
+	Body["Repo"] = key
+	var obj Object
+	if err := codec.Get(key, &obj); err != nil {
+		StdOut, StdErr := run("dockers/Golang", "Dockerfile", key)
+		stdOut := strings.Trim(StdOut, " \n")
+		var Cover string
+		if stdOut != "" {
+			Cover = stdOut
+		} else {
+			Cover = StdErr
+		}
+		Body["Cover"] = Cover
+
+		obj := &Object{
+			Cover: Cover,
+		}
+		codec.Set(&cache.Item{
+			Key:        key,
+			Object:     obj,
+			Expiration: time.Hour,
+		})
 	} else {
-		Body["Cover"] = StdErr
+		Body["Cover"] = obj.Cover
 	}
 
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
