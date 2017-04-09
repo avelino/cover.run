@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -65,6 +66,12 @@ func repoCover(repo string) (obj Object) {
 	return
 }
 
+func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	obj := repoCover(vars["repo"])
+	json.NewEncoder(w).Encode(obj)
+}
+
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
@@ -88,6 +95,7 @@ func main() {
 	n := negroni.Classic()
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
+	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
 	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
