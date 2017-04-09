@@ -1,5 +1,7 @@
 0.0.0.0
 
+timeouts 0
+
 proxy / cover.run:3000 {
       except /assets
 }
