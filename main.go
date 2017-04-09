@@ -7,6 +7,9 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,6 +75,47 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(obj)
 }
 
+type copier struct {
+	transport http.RoundTripper
+}
+
+func (c copier) RoundTrip(request *http.Request) (*http.Response, error) {
+	response, err := c.transport.RoundTrip(request)
+	return response, err
+}
+
+func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
+	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
+	w.Header().Set("pragma", "no-cache")
+	w.Header().Set("expires", "-1")
+
+	vars := mux.Vars(r)
+	obj := repoCover(vars["repo"])
+	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
+	var color string
+	if cover >= 70 {
+		color = "green"
+	} else if cover >= 45 {
+		color = "yellow"
+	} else {
+		color = "red"
+	}
+
+	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=flat-square"
+	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color), "%", "%25", 1)
+	u, err := url.Parse(badge)
+	if err == nil {
+		r.Host = "img.shields.io"
+		proxy := httputil.NewSingleHostReverseProxy(u)
+		proxy.Transport = &copier{transport: http.DefaultTransport}
+		proxy.ServeHTTP(w, r)
+
+	} else {
+		w.Write([]byte(err.Error()))
+	}
+}
+
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
@@ -96,6 +140,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
 	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
+	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
 	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
