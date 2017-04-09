@@ -7,8 +7,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -104,16 +102,9 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 
 	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=flat-square"
 	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color), "%", "%25", 1)
-	u, err := url.Parse(badge)
-	if err == nil {
-		r.Host = "img.shields.io"
-		proxy := httputil.NewSingleHostReverseProxy(u)
-		proxy.Transport = &copier{transport: http.DefaultTransport}
-		proxy.ServeHTTP(w, r)
 
-	} else {
-		w.Write([]byte(err.Error()))
-	}
+	http.Redirect(w, r, badge, http.StatusTemporaryRedirect)
+	return
 }
 
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
