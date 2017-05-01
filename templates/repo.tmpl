@@ -4,7 +4,9 @@
 {{end}}
 
 {{define "content"}}
-<img src="https://cover.run/go/{{.Repo}}.svg" alt="{{.Cover}}" />
+<a href="https://cover.run/go/{{.Repo}}"><img src="https://cover.run/go/{{.Repo}}.svg" alt="{{.Cover}}" /></a>
+<a href="https://goreportcard.com/report/{{.Repo}}" target="_blank"><img src="https://goreportcard.com/badge/{{.Repo}}"></a>
+
 <div class="jumbotron well">
      <h2>{{.Cover}}</h2>
 </div>
