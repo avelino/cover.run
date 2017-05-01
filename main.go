@@ -27,7 +27,7 @@ type Object struct {
 func redisConn() (ring *redis.Ring, codec *cache.Codec) {
 	ring = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
-			"server1": "127.0.0.1:6379",
+			"server1": "redis:6379",
 		},
 	})
 	codec = &cache.Codec{
