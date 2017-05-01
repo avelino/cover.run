@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -25,19 +24,13 @@ type Object struct {
 	Cover string
 }
 
-func main2() {
-	repo := flag.String("repo", "", "a string")
-	flag.Parse()
-	run("dockers/Golang", "Dockerfile", *repo)
-}
-
-func repoCover(repo string) (obj Object) {
-	ring := redis.NewRing(&redis.RingOptions{
+func redisConn() (ring *redis.Ring, codec *cache.Codec) {
+	ring = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
-			"server1": "redis:6379",
+			"server1": "127.0.0.1:6379",
 		},
 	})
-	codec := &cache.Codec{
+	codec = &cache.Codec{
 		Redis: ring,
 
 		Marshal: func(v interface{}) ([]byte, error) {
@@ -47,6 +40,12 @@ func repoCover(repo string) (obj Object) {
 			return msgpack.Unmarshal(b, v)
 		},
 	}
+	return
+}
+
+func repoCover(repo string) (obj Object) {
+	_, codec := redisConn()
+
 	if err := codec.Get(repo, &obj); err != nil {
 		StdOut, StdErr := run("dockers/Golang", "Dockerfile", repo)
 		stdOut := strings.Trim(StdOut, " \n")
@@ -82,6 +81,35 @@ func (c copier) RoundTrip(request *http.Request) (*http.Response, error) {
 	return response, err
 }
 
+type Repository struct {
+	Repo  string
+	Cover string
+}
+
+func repoLatest() (repo []Repository) {
+	ring, codec := redisConn()
+	keys, err := ring.Keys("*").Result()
+	if err != nil {
+		log.Println(err)
+	}
+
+	if len(keys) >= 1 {
+		slice := 5
+		if len(keys) < 5 {
+			slice = len(keys)
+		}
+		keys = keys[:slice]
+	}
+
+	var obj Object
+	for _, key := range keys {
+		if err := codec.Get(key, &obj); err == nil {
+			repo = append(repo, Repository{key, obj.Cover})
+		}
+	}
+	return
+}
+
 func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
 	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
@@ -114,15 +142,19 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body["Repo"] = repo
 	obj := repoCover(repo)
 	Body["Cover"] = obj.Cover
+	Body["repositories"] = repoLatest()
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	t.Execute(w, Body)
 	return
-
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
-	t.Execute(w, nil)
+
+	Body := map[string]interface{}{}
+	Body["repositories"] = repoLatest()
+
+	t.Execute(w, Body)
 	return
 }
 
@@ -152,5 +184,6 @@ func run(contextDir, dockerFile, repo string) (StdOut, StdErr string) {
 	if err != nil {
 		log.Println(err)
 	}
+
 	return
 }

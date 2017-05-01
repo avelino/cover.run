@@ -26,6 +26,21 @@
 				{{template "breadcrumb" .}}
 			</ul>
 			{{template "content" .}}
+
+			<div class="row">
+			  <div class="col-md-4">
+     			    <div class="list-group">
+			      <a class="list-group-item active">Last repositories covered</a>
+			      {{ range $obj := .repositories}}
+			      <a class="list-group-item" href="/go/{{ $obj.Repo }}">
+				{{ $obj.Repo }}
+				<span class="badge orange">{{ $obj.Cover }}</span>
+			      </a>
+			      {{ end }}
+			    </div>
+			  </div>
+			</div>
+
 			<address>
 			  <p>
 			    <a href="https://github.com/avelino/cover.run" target="_blank">View on GitHub</a>
@@ -44,7 +59,6 @@
 
   ga('create', 'UA-96762700-1', 'auto');
   ga('send', 'pageview');
-
 </script>
   </body>
 </html>
