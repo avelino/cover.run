@@ -7,7 +7,7 @@
 
     <meta name="description" content="Cover as a service">
     <meta name="author" content="Avelino">
-    <title>cover.run</title>
+    <title>{{if .Repo}}{{.Repo}} - {{end}}cover.run</title>
 
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/style.css" rel="stylesheet">
@@ -19,7 +19,7 @@
 	<div class="row">
 		<div class="col-md-12">
 			<div class="page-header">
-				<h1>cover.run</h1>
+				<h1>{{if .Repo}}{{.Repo}}{{else}}cover.run{{end}}</h1>
 			</div>
 			<ul class="breadcrumb">
 				<li><a href="/">cover.run</a> <span class="divider">/</span></li>
