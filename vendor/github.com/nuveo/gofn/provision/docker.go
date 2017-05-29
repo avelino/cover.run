@@ -19,15 +19,12 @@ var (
 	// ErrContainerNotFound is raised when image is not found
 	ErrContainerNotFound = errors.New("provision: container not found")
 
+	// ErrContainerExecutionFailed is raised if container exited with status different of zero
+	ErrContainerExecutionFailed = errors.New("provision: container exited with failure")
+
 	// Input receives a string that will be written to the stdin of the container in function FnRun
 	Input string
 )
-
-// VolumeOptions are options to mount a host directory as data volume
-type VolumeOptions struct {
-	Source      string
-	Destination string
-}
 
 // BuildOptions are options used in the image build
 type BuildOptions struct {
@@ -40,6 +37,15 @@ type BuildOptions struct {
 	Iaas                    iaas.Iaas
 }
 
+// ContainerOptions are options used in container
+type ContainerOptions struct {
+	Cmd     []string
+	Volumes []string
+	Image   string
+	Env     []string
+}
+
+// GetImageName sets preffix gofn when needed
 func (opts BuildOptions) GetImageName() string {
 	if opts.DoNotUsePrefixImageName {
 		return opts.ImageName
@@ -64,19 +70,18 @@ func FnRemove(client *docker.Client, containerID string) (err error) {
 }
 
 // FnContainer create container
-func FnContainer(client *docker.Client, image, volume string) (container *docker.Container, err error) {
-	binds := []string{}
-	if volume != "" {
-		binds = append(binds, volume)
+func FnContainer(client *docker.Client, opts ContainerOptions) (container *docker.Container, err error) {
+	config := &docker.Config{
+		Image:     opts.Image,
+		Cmd:       opts.Cmd,
+		Env:       opts.Env,
+		StdinOnce: true,
+		OpenStdin: true,
 	}
 	container, err = client.CreateContainer(docker.CreateContainerOptions{
 		Name:       fmt.Sprintf("gofn-%s", uuid.NewV4().String()),
-		HostConfig: &docker.HostConfig{Binds: binds},
-		Config: &docker.Config{
-			Image:     image,
-			StdinOnce: true,
-			OpenStdin: true,
-		},
+		HostConfig: &docker.HostConfig{Binds: opts.Volumes},
+		Config:     config,
 	})
 	return
 }
@@ -180,17 +185,14 @@ func FnRun(client *docker.Client, containerID, input string) (Stdout *bytes.Buff
 		return
 	}
 
-	done, errors := FnWaitContainer(client, containerID)
-	select {
-	case err = <-errors:
-		return
-	case <-done:
-	}
+	e := FnWaitContainer(client, containerID)
+	err = <-e
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	FnLogs(client, containerID, stdout, stderr)
+	// omit logs beacuse execution error is more important
+	_ = FnLogs(client, containerID, stdout, stderr)
 
 	Stdout = stdout
 	Stderr = stderr
@@ -209,26 +211,17 @@ func FnLogs(client *docker.Client, containerID string, stdout io.Writer, stderr 
 }
 
 // FnWaitContainer wait until container finnish your processing
-func FnWaitContainer(client *docker.Client, containerID string) (chan bool, chan error) {
-	done := make(chan bool)
-	errors := make(chan error)
+func FnWaitContainer(client *docker.Client, containerID string) chan error {
+	errs := make(chan error)
 	go func() {
-		_, err := client.WaitContainer(containerID)
+		code, err := client.WaitContainer(containerID)
 		if err != nil {
-			errors <- err
+			errs <- err
 		}
-		done <- true
+		if code != 0 {
+			errs <- ErrContainerExecutionFailed
+		}
+		errs <- nil
 	}()
-	return done, errors
-}
-
-// FnConfigVolume set volume options
-func FnConfigVolume(opts *VolumeOptions) string {
-	if opts.Source == "" && opts.Destination == "" {
-		return ""
-	}
-	if opts.Destination == "" {
-		opts.Destination = opts.Source
-	}
-	return opts.Source + ":" + opts.Destination
+	return errs
 }
