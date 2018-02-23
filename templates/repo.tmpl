@@ -3,9 +3,7 @@
 {{end}}
 
 {{define "footer"}}
-<script>
- var clipboard = new Clipboard('.btn');
-</script>
+<script>var clipboard = new Clipboard('.btn');</script>
 {{end}}
 
 {{define "breadcrumb"}}
@@ -14,14 +12,14 @@
 {{end}}
 
 {{define "content"}}
-<a href="https://cover.run/go/{{.Repo}}"><img src="https://cover.run/go/{{.Repo}}.svg" alt="{{.Cover}}" /></a>
+<a href="https://cover.run/go/{{.Repo}}?tag={{.Tag}}"><img src="https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}}" alt="{{.Cover}}" /></a>
 <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank"><img src="https://goreportcard.com/badge/{{.Repo}}"></a>
 <a href="https://godoc.org/{{.Repo}}" target="_blank"><img src="https://godoc.org/{{.Repo}}?status.svg"></a>
 <br />
-Markdown: <input id="markdown" type="text" value="![cover.run go](https://cover.run/go/{{.Repo}}.svg)">
+Markdown: <input id="markdown" type="text" value="![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})">
 <button class="btn" data-clipboard-action="copy" data-clipboard-target="#markdown">Copy</button>
 
 <div class="jumbotron well">
-     <h2>{{.Cover}}</h2>
+  <h2>{{.Cover}}</h2>
 </div>
 {{end}}

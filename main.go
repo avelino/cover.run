@@ -159,6 +159,7 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body["Repo"] = repo
 	obj := repoCover(repo, tag)
 	Body["Cover"] = obj.Cover
+	Body["Tag"] = obj.Tag
 	Body["repositories"] = repoLatest()
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	t.Execute(w, Body)
