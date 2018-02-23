@@ -20,8 +20,15 @@ import (
 	"github.com/urfave/negroni"
 )
 
+const (
+	DEFAULT_TAG = "golang-1.10"
+)
+
 type Object struct {
-	Cover string
+	Repo   string
+	Tag    string
+	Cover  string
+	Output bool
 }
 
 func redisConn() (ring *redis.Ring, codec *cache.Codec) {
@@ -43,22 +50,22 @@ func redisConn() (ring *redis.Ring, codec *cache.Codec) {
 	return
 }
 
-func repoCover(repo string) (obj Object) {
+func repoCover(repo, imageTag string) (obj Object) {
 	_, codec := redisConn()
-
-	if err := codec.Get(repo, &obj); err != nil {
-		StdOut, StdErr := run("dockers/Golang", "Dockerfile", repo)
+	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
+	obj.Repo = repo
+	obj.Tag = imageTag
+	if err := codec.Get(cacheKey, &obj); err != nil {
+		StdOut, StdErr := run("avelino/cover.run", imageTag, repo)
 		stdOut := strings.Trim(StdOut, " \n")
+		obj.Cover = StdErr
+		obj.Output = false
 		if stdOut != "" {
 			obj.Cover = stdOut
-		} else {
-			obj.Cover = StdErr
-		}
-		obj := &Object{
-			Cover: obj.Cover,
+			obj.Output = true
 		}
 		codec.Set(&cache.Item{
-			Key:        repo,
+			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
 		})
@@ -68,7 +75,11 @@ func repoCover(repo string) (obj Object) {
 
 func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	obj := repoCover(vars["repo"])
+	tag := r.URL.Query().Get("tag")
+	if tag == "" {
+		tag = DEFAULT_TAG
+	}
+	obj := repoCover(vars["repo"], tag)
 	json.NewEncoder(w).Encode(obj)
 }
 
@@ -83,28 +94,26 @@ func (c copier) RoundTrip(request *http.Request) (*http.Response, error) {
 
 type Repository struct {
 	Repo  string
+	Tag   string
 	Cover string
 }
 
-func repoLatest() (repo []Repository) {
+func repoLatest() (repos []Repository) {
 	ring, codec := redisConn()
 	keys, err := ring.Keys("*").Result()
 	if err != nil {
 		log.Println(err)
 	}
 
-	if len(keys) >= 1 {
-		slice := 5
-		if len(keys) < 5 {
-			slice = len(keys)
-		}
-		keys = keys[:slice]
-	}
-
 	var obj Object
 	for _, key := range keys {
+		if len(repos) == 5 {
+			return
+		}
 		if err := codec.Get(key, &obj); err == nil {
-			repo = append(repo, Repository{key, obj.Cover})
+			if obj.Output {
+				repos = append(repos, Repository{obj.Repo, obj.Tag, obj.Cover})
+			}
 		}
 	}
 	return
@@ -117,7 +126,11 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("expires", "-1")
 
 	vars := mux.Vars(r)
-	obj := repoCover(vars["repo"])
+	tag := r.URL.Query().Get("tag")
+	if tag == "" {
+		tag = DEFAULT_TAG
+	}
+	obj := repoCover(vars["repo"], tag)
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
 	if cover >= 70 {
@@ -139,8 +152,12 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
 	repo := vars["repo"]
+	tag := r.URL.Query().Get("tag")
+	if tag == "" {
+		tag = DEFAULT_TAG
+	}
 	Body["Repo"] = repo
-	obj := repoCover(repo)
+	obj := repoCover(repo, tag)
 	Body["Cover"] = obj.Cover
 	Body["repositories"] = repoLatest()
 	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
