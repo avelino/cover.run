@@ -33,7 +33,7 @@
      	      <div class="list-group">
 		<a class="list-group-item active">Last repositories covered</a>
 		{{ range $obj := .repositories}}
-		<a class="list-group-item" href="/go/{{ $obj.Repo }}">
+		<a class="list-group-item" href="/go/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
 		  {{ $obj.Repo }}
 		  <span class="badge orange">{{ $obj.Tag }}</span>
 		  <span class="badge orange">{{ $obj.Cover }}</span>
