@@ -20,6 +20,6 @@ Markdown: <input id="markdown" type="text" value="![cover.run go](https://cover.
 <button class="btn" data-clipboard-action="copy" data-clipboard-target="#markdown">Copy</button>
 
 <div class="jumbotron well">
-  <h2>{{.Cover}}</h2>
+  <h2>{{.Cover | html}}</h2>
 </div>
 {{end}}

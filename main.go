@@ -24,6 +24,17 @@ const (
 	DEFAULT_TAG = "golang-1.10"
 )
 
+func imageSupported(tag string) bool {
+	switch tag {
+	case
+		"golang-1.10",
+		"golang-1.9",
+		"golang-1.8":
+		return true
+	}
+	return false
+}
+
 type Object struct {
 	Repo   string
 	Tag    string
@@ -55,6 +66,10 @@ func repoCover(repo, imageTag string) (obj Object) {
 	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
 	obj.Repo = repo
 	obj.Tag = imageTag
+	if !imageSupported(imageTag) {
+		obj.Cover = fmt.Sprintf("Sorry, not found docker image avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
+		return
+	}
 	if err := codec.Get(cacheKey, &obj); err != nil {
 		StdOut, StdErr := run("avelino/cover.run", imageTag, repo)
 		stdOut := strings.Trim(StdOut, " \n")
