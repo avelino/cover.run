@@ -171,12 +171,11 @@ func main() {
 	n.Run(":3000")
 }
 
-func run(contextDir, dockerFile, repo string) (StdOut, StdErr string) {
+func run(imageRepoName, dockerTag, repo string) (StdOut, StdErr string) {
 	buildOpts := &provision.BuildOptions{
-		ContextDir: contextDir,
-		Dockerfile: dockerFile,
-		ImageName:  strings.ToLower(fmt.Sprintf("%s/%s", contextDir, dockerFile)),
-		StdIN:      fmt.Sprintf("sh /run.sh %s", repo),
+		DoNotUsePrefixImageName: true,
+		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
+		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
 	containerOpts := &provision.ContainerOptions{}
 	StdOut, StdErr, err := gofn.Run(
