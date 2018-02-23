@@ -1,4 +1,4 @@
-FROM golang:1.8
+FROM golang:1.10
 
 RUN mkdir -p /go/src/github.com/avelino/cover.run
 COPY  ./ /go/src/github.com/avelino/cover.run
