@@ -145,6 +145,12 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	if tag == "" {
 		tag = DEFAULT_TAG
 	}
+
+	badgeStyle := r.URL.Query().Get("style")
+	if badgeStyle != "curve" {
+		badgeStyle = "flat-square"
+	}
+
 	obj := repoCover(vars["repo"], tag)
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
@@ -156,8 +162,8 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=flat-square"
-	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color), "%", "%25", 1)
+	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=%s"
+	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color, badgeStyle), "%", "%25", 1)
 
 	http.Redirect(w, r, badge, http.StatusTemporaryRedirect)
 	return
