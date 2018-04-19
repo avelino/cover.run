@@ -1,67 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <meta name="description" content="Cover as a service">
-    <meta name="author" content="Avelino">
-    <title>{{if .Repo}}{{.Repo}} - {{end}}cover.run</title>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="description" content="Cover as a service">
+		<meta name="author" content="Avelino">
 
-    <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/assets/css/style.css" rel="stylesheet">
+		<title>{{if .Repo}}{{.Repo}} - {{end}}cover.run</title>
 
-    <script src="/assets/js/jquery.min.js"></script>
-    {{template "head" .}}
-  </head>
-  <body>
-    <div class="container-fluid">
-      <div class="row">
-	<div class="col-md-12">
-	  <div class="page-header">
-	    <h1>{{if .Repo}}{{.Repo}}{{else}}cover.run{{end}}</h1>
-	  </div>
-	  <ul class="breadcrumb">
-	    <li><a href="/">cover.run</a> <span class="divider">/</span></li>
-	    {{template "breadcrumb" .}}
-	  </ul>
-	  {{template "content" .}}
+		<link href="/assets/css/bootstrap.min.css" rel="stylesheet">
+		<link href="/assets/css/style.css" rel="stylesheet">
 
-	  <div class="row">
-	    <div class="col-md-4">
-     	      <div class="list-group">
-		<a class="list-group-item active">Last repositories covered</a>
-		{{ range $obj := .repositories}}
-		<a class="list-group-item" href="/go/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
-		  {{ $obj.Repo }}
-		  <span class="badge orange">{{ $obj.Tag }}</span>
-		  <span class="badge orange">{{ $obj.Cover }}</span>
-		</a>
-		{{ end }}
-	      </div>
-	    </div>
-	  </div>
+		<script src="/assets/js/jquery.min.js"></script> {{template "head" .}}
+	</head>
 
-	  <address>
-	    <p>
-	      <a href="https://github.com/avelino/cover.run" target="_blank">View on GitHub</a>
-	    </p>
-	  </address>
-	</div>
-      </div>
-    </div>
+	<body>
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-md-12">
+					<div class="page-header">
+						<h1>{{if .Repo}}{{.Repo}}{{else}}cover.run{{end}}</h1>
+					</div>
+					<ul class="breadcrumb">
+						<li>
+							<a href="/">cover.run</a>
+							<span class="divider">/</span>
+						</li>
+						{{template "breadcrumb" .}}
+					</ul>
+					{{template "content" .}}
 
-    <script src="/assets/js/bootstrap.min.js"></script>
-    {{template "footer" .}}
-    <script>
-     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-			      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-     })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+					<div class="row">
+						<div class="col-md-4">
+							<div class="list-group">
+								<a class="list-group-item active">Last repositories covered</a>
+								{{ range $obj := .repositories}}
+								<a class="list-group-item" href="/go/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
+									{{ $obj.Repo }}
+									<span class="badge orange">{{ $obj.Tag }}</span>
+									<span class="badge orange">{{ $obj.Cover }}</span>
+								</a>
+								{{ end }}
+							</div>
+						</div>
+					</div>
 
-     ga('create', 'UA-96762700-1', 'auto');
-     ga('send', 'pageview');
-    </script>
-  </body>
+					<address>
+						<p>
+							<a href="https://github.com/avelino/cover.run" target="_blank">View on GitHub</a>
+						</p>
+					</address>
+				</div>
+			</div>
+		</div>
+
+		<script src="/assets/js/bootstrap.min.js"></script> {{template "footer" .}}
+		<script>
+			(function (i, s, o, g, r, a, m) {
+				i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+					(i[r].q = i[r].q || []).push(arguments)
+				}, i[r].l = 1 * new Date(); a = s.createElement(o),
+					m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+			})(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+			ga('create', 'UA-96762700-1', 'auto');
+			ga('send', 'pageview');
+		</script>
+	</body>
 </html>
