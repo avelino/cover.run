@@ -21,9 +21,11 @@ import (
 )
 
 const (
+	// DEFAULT_TAG is the default Go version with which test coverage is done
 	DEFAULT_TAG = "golang-1.10"
 )
 
+// imageSupported verifies if the requested Go version is supported or not
 func imageSupported(tag string) bool {
 	switch tag {
 	case
@@ -35,13 +37,19 @@ func imageSupported(tag string) bool {
 	return false
 }
 
+// Object has the details of the repo which is being tested for coverage
 type Object struct {
-	Repo   string
-	Tag    string
-	Cover  string
+	// Repository URL
+	Repo string
+	// Go version
+	Tag string
+	// Cover result (can be error or successful result. Successful result is in percentage e.g. 80%)
+	Cover string
+	// Output - unknown
 	Output bool
 }
 
+// redisConn returns a redis Connection
 func redisConn() (ring *redis.Ring, codec *cache.Codec) {
 	ring = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -61,13 +69,14 @@ func redisConn() (ring *redis.Ring, codec *cache.Codec) {
 	return
 }
 
+// repoCover calculates the test coverage of a given repository
 func repoCover(repo, imageTag string) (obj Object) {
 	_, codec := redisConn()
 	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
 	obj.Repo = repo
 	obj.Tag = imageTag
 	if !imageSupported(imageTag) {
-		obj.Cover = fmt.Sprintf("Sorry, not found docker image avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
+		obj.Cover = fmt.Sprintf("Sorry docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
 		return
 	}
 	if err := codec.Get(cacheKey, &obj); err != nil {
@@ -88,6 +97,7 @@ func repoCover(repo, imageTag string) (obj Object) {
 	return
 }
 
+// HandlerRepoJSON sends the coverage data in JSON format
 func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	tag := r.URL.Query().Get("tag")
@@ -147,7 +157,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	badgeStyle := r.URL.Query().Get("style")
-	if badgeStyle != "curve" {
+	if badgeStyle != "flat" {
 		badgeStyle = "flat-square"
 	}
 
@@ -162,11 +172,20 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=%s"
-	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color, badgeStyle), "%", "%25", 1)
+	badgeName := fmt.Sprintf("%s%s%%s", color, badgeStyle, obj.Cover)
+	badgeSVG, err := getBadgeCache(badgeName)
+	if err == nil && len(badgeSVG) > 0 {
+		serveBadge(w, badgeSVG)
+		return
+	}
 
-	http.Redirect(w, r, badge, http.StatusTemporaryRedirect)
-	return
+	badge, err := getBadge(color, badgeStyle, obj.Cover)
+	badgeSVG = string(badge)
+	if err == nil {
+		go setBadgeCache(badgeName, badgeSVG)
+		setBadgeCache(badgeName, badgeSVG)
+	}
+	serveBadge(w, badgeSVG)
 }
 
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {

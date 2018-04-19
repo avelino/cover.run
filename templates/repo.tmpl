@@ -1,25 +1,30 @@
 {{define "head"}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.6.1/clipboard.min.js"></script>
 {{end}}
-
 {{define "footer"}}
-<script>var clipboard = new Clipboard('.btn');</script>
-{{end}}
-
-{{define "breadcrumb"}}
-<li><a href="/">go</a> <span class="divider">/</span></li>
+<script>var clipboard = new Clipboard('.btn');</script> {{end}} {{define "breadcrumb"}}
+<li>
+  <a href="/">go</a>
+  <span class="divider">/</span>
+</li>
 <li class="active">{{.Repo}}</li>
-{{end}}
-
+{{end}} 
 {{define "content"}}
 <div class="row">
   <div class="col-md-12">
-  <a href="https://cover.run/go/{{.Repo}}?tag={{.Tag}}"><img src="https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}}" alt="{{.Cover}}" /></a>
-  <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank"><img src="https://goreportcard.com/badge/{{.Repo}}"></a>
-  <a href="https://godoc.org/{{.Repo}}" target="_blank"><img src="https://godoc.org/{{.Repo}}?status.svg"></a>
+    <a href="https://cover.run/go/{{.Repo}}?tag={{.Tag}}">
+      <img src="https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}}" alt="{{.Cover}}" />
+    </a>
+    <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank">
+      <img src="https://goreportcard.com/badge/{{.Repo}}">
+    </a>
+    <a href="https://godoc.org/{{.Repo}}" target="_blank">
+      <img src="https://godoc.org/{{.Repo}}?status.svg">
+    </a>
   </div>
 </div>
-Markdown: <input id="markdown" type="text" value="![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})">
+Markdown:
+<input id="markdown" type="text" value="![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})">
 <button class="btn" data-clipboard-action="copy" data-clipboard-target="#markdown">Copy</button>
 
 <div class="jumbotron well">
