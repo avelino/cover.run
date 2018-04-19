@@ -51,6 +51,8 @@ func setBadgeCache(imgName, bdgSVG string) error {
 	return codec.Set(&cache.Item{
 		Key:    imgName,
 		Object: bdgSVG,
+		// Disabling expiry
+		Expiration: -1,
 	})
 }
 
