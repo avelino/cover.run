@@ -68,6 +68,7 @@ func getBadgeCache(imgName string) (string, error) {
 	return bdgBytes, nil
 }
 
+// serveBadge serves the SVG file with the required response headers
 func serveBadge(w http.ResponseWriter, badge string) {
 	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
 	w.Header().Set("Content-Encoding", "br")
