@@ -167,7 +167,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
 	svg, err := redisRing.Get(badgeName).Bytes()
 	if err != nil {
-	i	if err != redis.Nil {
+	 	if err != redis.Nil {
 			log.Print("badge cache lookup: ", err)
 		}
 
