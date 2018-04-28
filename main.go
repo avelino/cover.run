@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,6 +21,10 @@ import (
 	"github.com/nuveo/gofn/provision"
 	"github.com/urfave/negroni"
 )
+
+var httpClient = &http.Client{
+	Timeout: 4 * time.Second,
+}
 
 const (
 	DEFAULT_TAG = "golang-1.10"
@@ -158,20 +164,31 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	badgeName := fmt.Sprintf("%s%s%%s", color, badgeStyle, obj.Cover)
-	badgeSVG, err := getBadgeCache(badgeName)
-	if err == nil && len(badgeSVG) > 0 {
-		serveBadge(w, badgeSVG)
-		return
+	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
+	svg, err := redisRing.Get(badgeName).Bytes()
+	if err != nil {
+		if err != redis.Nil {
+			log.Print("badge cache lookup: ", err)
+		}
+
+		svg, err = getBadge(color, badgeStyle, obj.Cover)
+		if err != nil {
+			log.Print("badge retrieve: ", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		go func() {
+			err := redisRing.Set(badgeName, svg, 0).Err()
+			if err != nil {
+				log.Print("badge store: ", err)
+			}
+		}()
 	}
 
-	badge, err := getBadge(color, badgeStyle, obj.Cover)
-	badgeSVG = string(badge)
-	if err == nil {
-		go setBadgeCache(badgeName, badgeSVG)
-		setBadgeCache(badgeName, badgeSVG)
-	}
-	serveBadge(w, badgeSVG)
+	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
+	w.Header().Set("Content-Encoding", "br")
+	w.Write(svg)
 }
 
 var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
@@ -228,4 +245,17 @@ func run(imageRepoName, dockerTag, repo string) (StdOut, StdErr string) {
 	}
 
 	return
+}
+
+// getBadge gets the badge from img.shields.io and return as []byte
+func getBadge(color, style, percent string) ([]byte, error) {
+	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
+
+	resp, err := httpClient.Get(imgURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
