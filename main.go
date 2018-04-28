@@ -158,7 +158,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	badgeName := fmt.Sprintf("%s%s%%s", color, badgeStyle, obj.Cover)
+	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
 	badgeSVG, err := getBadgeCache(badgeName)
 	if err == nil && len(badgeSVG) > 0 {
 		serveBadge(w, badgeSVG)
