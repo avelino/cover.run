@@ -7,8 +7,6 @@ import (
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/go-redis/cache"
 )
 
 var netTransport = &http.Transport{
@@ -39,31 +37,4 @@ func getBadge(color, style, percent string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
-}
-
-// setBadgeCache will get the badge and set it inside redis as plain string (svg)
-func setBadgeCache(imgName, bdgSVG string) error {
-	return redisCodec.Set(&cache.Item{
-		Key:    imgName,
-		Object: bdgSVG,
-		// Disabling expiry
-		Expiration: -1,
-	})
-}
-
-// getBadgeCache gets the image from redis
-func getBadgeCache(imgName string) (string, error) {
-	bdgBytes := ""
-	err := redisCodec.Get(imgName, &bdgBytes)
-	if err != nil {
-		return "", err
-	}
-	return bdgBytes, nil
-}
-
-// serveBadge serves the SVG file with the required response headers
-func serveBadge(w http.ResponseWriter, badge string) {
-	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
-	w.Header().Set("Content-Encoding", "br")
-	fmt.Fprint(w, badge)
 }

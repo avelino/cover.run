@@ -159,18 +159,35 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
-	badgeSVG, err := getBadgeCache(badgeName)
-	if err == nil && len(badgeSVG) > 0 {
-		serveBadge(w, badgeSVG)
+	svg, err := redisRing.Get(badgeName).Bytes()
+	switch err {
+	case nil:
+		break // use cache entry
+
+	case redis.Nil:
+		svg, err = getBadge(color, badgeStyle, obj.Cover)
+		if err != nil {
+			log.Print("badge lookup: ", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		go func() {
+			err := redisRing.Set(badgeName, svg, 0).Err()
+			if err != nil {
+				log.Print("badge store: ", err)
+			}
+		}()
+
+	default:
+		log.Print(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	badge, err := getBadge(color, badgeStyle, obj.Cover)
-	badgeSVG = string(badge)
-	if err == nil {
-		go setBadgeCache(badgeName, badgeSVG)
-	}
-	serveBadge(w, badgeSVG)
+	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
+	w.Header().Set("Content-Encoding", "br")
+	w.Write(svg)
 }
 
 var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
