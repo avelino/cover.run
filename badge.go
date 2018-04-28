@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -37,12 +38,7 @@ func getBadge(color, style, percent string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
+	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
 
 // setBadgeCache will get the badge and set it inside redis as plain string (svg)
@@ -57,7 +53,6 @@ func setBadgeCache(imgName, bdgSVG string) error {
 
 // getBadgeCache gets the image from redis
 func getBadgeCache(imgName string) (string, error) {
-	// Maximum 1KB size, 1024 bytes
 	bdgBytes := ""
 	err := redisCodec.Get(imgName, &bdgBytes)
 	if err != nil {
