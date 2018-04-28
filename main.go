@@ -42,27 +42,24 @@ type Object struct {
 	Output bool
 }
 
-func redisConn() (ring *redis.Ring, codec *cache.Codec) {
-	ring = redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{
-			"server1": "redis:6379",
-		},
-	})
-	codec = &cache.Codec{
-		Redis: ring,
+var redisRing = redis.NewRing(&redis.RingOptions{
+	Addrs: map[string]string{
+		"server1": "redis:6379",
+	},
+})
 
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
-	}
-	return
+var redisCodec = &cache.Codec{
+	Redis: redisRing,
+
+	Marshal: func(v interface{}) ([]byte, error) {
+		return msgpack.Marshal(v)
+	},
+	Unmarshal: func(b []byte, v interface{}) error {
+		return msgpack.Unmarshal(b, v)
+	},
 }
 
 func repoCover(repo, imageTag string) (obj Object) {
-	_, codec := redisConn()
 	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
 	obj.Repo = repo
 	obj.Tag = imageTag
@@ -70,7 +67,7 @@ func repoCover(repo, imageTag string) (obj Object) {
 		obj.Cover = fmt.Sprintf("Sorry, not found docker image avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
 		return
 	}
-	if err := codec.Get(cacheKey, &obj); err != nil {
+	if err := redisCodec.Get(cacheKey, &obj); err != nil {
 		StdOut, StdErr := run("avelino/cover.run", imageTag, repo)
 		stdOut := strings.Trim(StdOut, " \n")
 		obj.Cover = StdErr
@@ -79,7 +76,7 @@ func repoCover(repo, imageTag string) (obj Object) {
 			obj.Cover = stdOut
 			obj.Output = true
 		}
-		codec.Set(&cache.Item{
+		redisCodec.Set(&cache.Item{
 			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
@@ -114,8 +111,7 @@ type Repository struct {
 }
 
 func repoLatest() (repos []Repository) {
-	ring, codec := redisConn()
-	keys, err := ring.Keys("*").Result()
+	keys, err := redisRing.Keys("*").Result()
 	if err != nil {
 		log.Println(err)
 	}
@@ -125,7 +121,7 @@ func repoLatest() (repos []Repository) {
 		if len(repos) == 5 {
 			return
 		}
-		if err := codec.Get(key, &obj); err == nil {
+		if err := redisCodec.Get(key, &obj); err == nil {
 			if obj.Output {
 				repos = append(repos, Repository{obj.Repo, obj.Tag, obj.Cover})
 			}
