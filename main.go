@@ -110,7 +110,7 @@ type Repository struct {
 	Cover string
 }
 
-func repoLatest() (repos []Repository) {
+func repoLatest() (repos []*Repository) {
 	keys, _, err := redisRing.Scan(0, "*", 10).Result()
 	if err != nil {
 		log.Println(err)
@@ -123,7 +123,7 @@ func repoLatest() (repos []Repository) {
 		}
 		if err := redisCodec.Get(key, &obj); err == nil {
 			if obj.Output {
-				repos = append(repos, Repository{obj.Repo, obj.Tag, obj.Cover})
+				repos = append(repos, &Repository{obj.Repo, obj.Tag, obj.Cover})
 			}
 		}
 	}
