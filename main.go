@@ -111,7 +111,7 @@ type Repository struct {
 }
 
 func repoLatest() (repos []Repository) {
-	keys, err := redisRing.Keys("*").Result()
+	keys, _, err := redisRing.Scan(0, "*", 10).Result()
 	if err != nil {
 		log.Println(err)
 	}
