@@ -47,8 +47,7 @@ func getBadge(color, style, percent string) ([]byte, error) {
 
 // setBadgeCache will get the badge and set it inside redis as plain string (svg)
 func setBadgeCache(imgName, bdgSVG string) error {
-	_, codec := redisConn()
-	return codec.Set(&cache.Item{
+	return redisCodec.Set(&cache.Item{
 		Key:    imgName,
 		Object: bdgSVG,
 		// Disabling expiry
@@ -58,10 +57,9 @@ func setBadgeCache(imgName, bdgSVG string) error {
 
 // getBadgeCache gets the image from redis
 func getBadgeCache(imgName string) (string, error) {
-	_, codec := redisConn()
 	// Maximum 1KB size, 1024 bytes
 	bdgBytes := ""
-	err := codec.Get(imgName, &bdgBytes)
+	err := redisCodec.Get(imgName, &bdgBytes)
 	if err != nil {
 		return "", err
 	}
