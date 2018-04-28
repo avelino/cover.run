@@ -42,27 +42,24 @@ type Object struct {
 	Output bool
 }
 
-func redisConn() (ring *redis.Ring, codec *cache.Codec) {
-	ring = redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{
-			"server1": "redis:6379",
-		},
-	})
-	codec = &cache.Codec{
-		Redis: ring,
+var redisRing = redis.NewRing(&redis.RingOptions{
+	Addrs: map[string]string{
+		"server1": "redis:6379",
+	},
+})
 
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
-	}
-	return
+var redisCodec = &cache.Codec{
+	Redis: redisRing,
+
+	Marshal: func(v interface{}) ([]byte, error) {
+		return msgpack.Marshal(v)
+	},
+	Unmarshal: func(b []byte, v interface{}) error {
+		return msgpack.Unmarshal(b, v)
+	},
 }
 
 func repoCover(repo, imageTag string) (obj Object) {
-	_, codec := redisConn()
 	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
 	obj.Repo = repo
 	obj.Tag = imageTag
@@ -70,7 +67,7 @@ func repoCover(repo, imageTag string) (obj Object) {
 		obj.Cover = fmt.Sprintf("Sorry, not found docker image avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
 		return
 	}
-	if err := codec.Get(cacheKey, &obj); err != nil {
+	if err := redisCodec.Get(cacheKey, &obj); err != nil {
 		StdOut, StdErr := run("avelino/cover.run", imageTag, repo)
 		stdOut := strings.Trim(StdOut, " \n")
 		obj.Cover = StdErr
@@ -79,7 +76,7 @@ func repoCover(repo, imageTag string) (obj Object) {
 			obj.Cover = stdOut
 			obj.Output = true
 		}
-		codec.Set(&cache.Item{
+		redisCodec.Set(&cache.Item{
 			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
@@ -113,9 +110,8 @@ type Repository struct {
 	Cover string
 }
 
-func repoLatest() (repos []Repository) {
-	ring, codec := redisConn()
-	keys, err := ring.Keys("*").Result()
+func repoLatest() (repos []*Repository) {
+	keys, _, err := redisRing.Scan(0, "*", 10).Result()
 	if err != nil {
 		log.Println(err)
 	}
@@ -125,9 +121,9 @@ func repoLatest() (repos []Repository) {
 		if len(repos) == 5 {
 			return
 		}
-		if err := codec.Get(key, &obj); err == nil {
+		if err := redisCodec.Get(key, &obj); err == nil {
 			if obj.Output {
-				repos = append(repos, Repository{obj.Repo, obj.Tag, obj.Cover})
+				repos = append(repos, &Repository{obj.Repo, obj.Tag, obj.Cover})
 			}
 		}
 	}
@@ -169,32 +165,31 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
+
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
-	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
 	repo := vars["repo"]
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
 		tag = DEFAULT_TAG
 	}
-	Body["Repo"] = repo
 	obj := repoCover(repo, tag)
-	Body["Cover"] = obj.Cover
-	Body["Tag"] = obj.Tag
-	Body["repositories"] = repoLatest()
-	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
-	t.Execute(w, Body)
-	return
+
+	repoTmpl.Execute(w, map[string]interface{}{
+		"Repo":         repo,
+		"Cover":        obj.Cover,
+		"Tag":          obj.Tag,
+		"repositories": repoLatest(),
+	})
 }
 
+var homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
+
 func Handler(w http.ResponseWriter, r *http.Request) {
-	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
-
-	Body := map[string]interface{}{}
-	Body["repositories"] = repoLatest()
-
-	t.Execute(w, Body)
-	return
+	homeTmpl.Execute(w, map[string]interface{}{
+		"repositories": repoLatest(),
+	})
 }
 
 func main() {
