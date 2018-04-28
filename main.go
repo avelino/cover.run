@@ -169,6 +169,8 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
+
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body := map[string]interface{}{}
 	vars := mux.Vars(r)
@@ -182,18 +184,17 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	Body["Cover"] = obj.Cover
 	Body["Tag"] = obj.Tag
 	Body["repositories"] = repoLatest()
-	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
-	t.Execute(w, Body)
+	repoTmpl.Execute(w, Body)
 	return
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
-	t := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
+var homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
 
+func Handler(w http.ResponseWriter, r *http.Request) {
 	Body := map[string]interface{}{}
 	Body["repositories"] = repoLatest()
 
-	t.Execute(w, Body)
+	homeTmpl.Execute(w, Body)
 	return
 }
 
