@@ -143,7 +143,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	badgeStyle := r.URL.Query().Get("style")
-	if badgeStyle != "curve" {
+	if badgeStyle != "flat" {
 		badgeStyle = "flat-square"
 	}
 
@@ -158,11 +158,20 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	SHIELDS := "https://img.shields.io/badge/cover.run-%s-%s.svg?style=%s"
-	badge := strings.Replace(fmt.Sprintf(SHIELDS, obj.Cover, color, badgeStyle), "%", "%25", 1)
+	badgeName := fmt.Sprintf("%s%s%%s", color, badgeStyle, obj.Cover)
+	badgeSVG, err := getBadgeCache(badgeName)
+	if err == nil && len(badgeSVG) > 0 {
+		serveBadge(w, badgeSVG)
+		return
+	}
 
-	http.Redirect(w, r, badge, http.StatusTemporaryRedirect)
-	return
+	badge, err := getBadge(color, badgeStyle, obj.Cover)
+	badgeSVG = string(badge)
+	if err == nil {
+		go setBadgeCache(badgeName, badgeSVG)
+		setBadgeCache(badgeName, badgeSVG)
+	}
+	serveBadge(w, badgeSVG)
 }
 
 var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
