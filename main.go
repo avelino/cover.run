@@ -169,7 +169,6 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	badgeSVG = string(badge)
 	if err == nil {
 		go setBadgeCache(badgeName, badgeSVG)
-		setBadgeCache(badgeName, badgeSVG)
 	}
 	serveBadge(w, badgeSVG)
 }
