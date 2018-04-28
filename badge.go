@@ -9,7 +9,7 @@ import (
 )
 
 var httpClient = &http.Client{
-	Timeout: time.Second * 20,
+	Timeout: 4 * time.Second,
 }
 
 // getBadge gets the badge from img.shields.io and return as []byte
