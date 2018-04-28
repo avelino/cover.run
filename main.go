@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,6 +21,10 @@ import (
 	"github.com/nuveo/gofn/provision"
 	"github.com/urfave/negroni"
 )
+
+var httpClient = &http.Client{
+	Timeout: 4 * time.Second,
+}
 
 const (
 	DEFAULT_TAG = "golang-1.10"
@@ -244,4 +250,17 @@ func run(imageRepoName, dockerTag, repo string) (StdOut, StdErr string) {
 	}
 
 	return
+}
+
+// getBadge gets the badge from img.shields.io and return as []byte
+func getBadge(color, style, percent string) ([]byte, error) {
+	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
+
+	resp, err := httpClient.Get(imgURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
