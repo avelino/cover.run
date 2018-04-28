@@ -166,14 +166,14 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 
 	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
 	svg, err := redisRing.Get(badgeName).Bytes()
-	switch err {
-	case nil:
-		break // use cache entry
+	if err != nil {
+	i	if err != redis.Nil {
+			log.Print("badge cache lookup: ", err)
+		}
 
-	case redis.Nil:
 		svg, err = getBadge(color, badgeStyle, obj.Cover)
 		if err != nil {
-			log.Print("badge lookup: ", err)
+			log.Print("badge retrieve: ", err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
@@ -184,11 +184,6 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 				log.Print("badge store: ", err)
 			}
 		}()
-
-	default:
-		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
