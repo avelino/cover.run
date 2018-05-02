@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,12 +24,46 @@ import (
 	"github.com/urfave/negroni"
 )
 
-var httpClient = &http.Client{
-	Timeout: 4 * time.Second,
-}
+var (
+	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
+
+	httpClient = &http.Client{
+		Timeout: 4 * time.Second,
+	}
+
+	// ErrImgUnSupported is the error returned when the Go version requested is
+	// not in the supported list
+	ErrImgUnSupported = errors.New("Unsupported Go version provided")
+)
+
+var (
+	redisRing = redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server1": "redis:6379",
+		},
+	})
+
+	redisCodec = &cache.Codec{
+		Redis: redisRing,
+
+		Marshal: func(v interface{}) ([]byte, error) {
+			return msgpack.Marshal(v)
+		},
+		Unmarshal: func(b []byte, v interface{}) error {
+			return msgpack.Unmarshal(b, v)
+		},
+	}
+)
+
+var (
+	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
+	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
+)
 
 const (
-	DEFAULT_TAG = "golang-1.10"
+	// DefaultTag is the Go version to run the tests with when no version
+	// is specified
+	DefaultTag = "golang-1.10"
 )
 
 func imageSupported(tag string) bool {
@@ -41,6 +77,7 @@ func imageSupported(tag string) bool {
 	return false
 }
 
+// Object struct holds all the details of a repository
 type Object struct {
 	Repo   string
 	Tag    string
@@ -48,33 +85,19 @@ type Object struct {
 	Output bool
 }
 
-var redisRing = redis.NewRing(&redis.RingOptions{
-	Addrs: map[string]string{
-		"server1": "redis:6379",
-	},
-})
-
-var redisCodec = &cache.Codec{
-	Redis: redisRing,
-
-	Marshal: func(v interface{}) ([]byte, error) {
-		return msgpack.Marshal(v)
-	},
-	Unmarshal: func(b []byte, v interface{}) error {
-		return msgpack.Unmarshal(b, v)
-	},
-}
-
-func repoCover(repo, imageTag string) (obj Object) {
+// repoCover returns code coverage details for the given repository and Go version
+func repoCover(repo, imageTag string) (*Object, error) {
+	obj := &Object{}
 	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
 	obj.Repo = repo
 	obj.Tag = imageTag
 	if !imageSupported(imageTag) {
-		obj.Cover = fmt.Sprintf("Sorry, not found docker image avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
-		return
+		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
+		return obj, ErrImgUnSupported
 	}
+
 	if err := redisCodec.Get(cacheKey, &obj); err != nil {
-		StdOut, StdErr := run("avelino/cover.run", imageTag, repo)
+		StdOut, StdErr, err := run("avelino/cover.run", imageTag, repo)
 		stdOut := strings.Trim(StdOut, " \n")
 		obj.Cover = StdErr
 		obj.Output = false
@@ -87,27 +110,25 @@ func repoCover(repo, imageTag string) (obj Object) {
 			Object:     obj,
 			Expiration: time.Hour,
 		})
+
+		return obj, err
 	}
-	return
+	return obj, nil
 }
 
+// HandlerRepoJSON returns the coverage details of a repository as JSON
 func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
-		tag = DEFAULT_TAG
+		tag = DefaultTag
 	}
-	obj := repoCover(vars["repo"], tag)
+	obj, err := repoCover(vars["repo"], tag)
+	if err != nil {
+		json.NewEncoder(w).Encode(obj)
+		return
+	}
 	json.NewEncoder(w).Encode(obj)
-}
-
-type copier struct {
-	transport http.RoundTripper
-}
-
-func (c copier) RoundTrip(request *http.Request) (*http.Response, error) {
-	response, err := c.transport.RoundTrip(request)
-	return response, err
 }
 
 type Repository struct {
@@ -116,16 +137,18 @@ type Repository struct {
 	Cover string
 }
 
-func repoLatest() (repos []*Repository) {
+func repoLatest() ([]*Repository, error) {
+	repos := make([]*Repository, 0)
 	keys, _, err := redisRing.Scan(0, "*", 10).Result()
 	if err != nil {
-		log.Println(err)
+		errLogger.Println(err)
+		return repos, err
 	}
 
 	var obj Object
 	for _, key := range keys {
 		if len(repos) == 5 {
-			return
+			return repos, nil
 		}
 		if err := redisCodec.Get(key, &obj); err == nil {
 			if obj.Output {
@@ -133,7 +156,7 @@ func repoLatest() (repos []*Repository) {
 			}
 		}
 	}
-	return
+	return repos, nil
 }
 
 func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +168,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
-		tag = DEFAULT_TAG
+		tag = DefaultTag
 	}
 
 	badgeStyle := r.URL.Query().Get("style")
@@ -153,7 +176,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		badgeStyle = "flat-square"
 	}
 
-	obj := repoCover(vars["repo"], tag)
+	obj, err := repoCover(vars["repo"], tag)
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
 	if cover >= 70 {
@@ -168,12 +191,12 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	svg, err := redisRing.Get(badgeName).Bytes()
 	if err != nil {
 		if err != redis.Nil {
-			log.Print("badge cache lookup: ", err)
+			errLogger.Print("badge cache lookup: ", err)
 		}
 
 		svg, err = getBadge(color, badgeStyle, obj.Cover)
 		if err != nil {
-			log.Print("badge retrieve: ", err)
+			errLogger.Print("badge retrieve: ", err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
@@ -181,7 +204,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			err := redisRing.Set(badgeName, svg, 0).Err()
 			if err != nil {
-				log.Print("badge store: ", err)
+				errLogger.Print("badge store: ", err)
 			}
 		}()
 	}
@@ -191,30 +214,39 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Write(svg)
 }
 
-var repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
-
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	repo := vars["repo"]
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
-		tag = DEFAULT_TAG
+		tag = DefaultTag
 	}
-	obj := repoCover(repo, tag)
+
+	obj, err := repoCover(repo, tag)
+	if err != nil {
+		return
+	}
+	repos, err := repoLatest()
+	if err != nil {
+		errLogger.Println(err)
+	}
 
 	repoTmpl.Execute(w, map[string]interface{}{
 		"Repo":         repo,
 		"Cover":        obj.Cover,
 		"Tag":          obj.Tag,
-		"repositories": repoLatest(),
+		"repositories": repos,
 	})
 }
 
-var homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
-
 func Handler(w http.ResponseWriter, r *http.Request) {
+	repos, err := repoLatest()
+	if err != nil {
+		errLogger.Println(err)
+	}
+
 	homeTmpl.Execute(w, map[string]interface{}{
-		"repositories": repoLatest(),
+		"repositories": repos,
 	})
 }
 
@@ -231,20 +263,19 @@ func main() {
 	n.Run(":3000")
 }
 
-func run(imageRepoName, dockerTag, repo string) (StdOut, StdErr string) {
+func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 	buildOpts := &provision.BuildOptions{
 		DoNotUsePrefixImageName: true,
 		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
 		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
-	containerOpts := &provision.ContainerOptions{}
-	StdOut, StdErr, err := gofn.Run(
-		buildOpts, containerOpts)
+
+	StdOut, StdErr, err := gofn.Run(buildOpts, &provision.ContainerOptions{})
 	if err != nil {
-		log.Println(err)
+		errLogger.Println(err, buildOpts)
 	}
 
-	return
+	return StdOut, StdErr, err
 }
 
 // getBadge gets the badge from img.shields.io and return as []byte
