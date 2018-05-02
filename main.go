@@ -102,7 +102,6 @@ func getBadge(color, style, percent string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
 
@@ -224,12 +223,12 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	svg, err := redisRing.Get(badgeName).Bytes()
 	if err != nil {
 		if err != redis.Nil {
-			errLogger.Print("badge cache lookup: ", err)
+			errLogger.Println(err)
 		}
 
 		svg, err = getBadge(color, badgeStyle, obj.Cover)
 		if err != nil {
-			errLogger.Print("badge retrieve: ", err)
+			errLogger.Println(err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
@@ -237,7 +236,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			err := redisRing.Set(badgeName, svg, 0).Err()
 			if err != nil {
-				errLogger.Print("badge store: ", err)
+				errLogger.Println(err)
 			}
 		}()
 	}
