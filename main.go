@@ -182,7 +182,7 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	obj, err := repoCover(vars["repo"], tag)
 	if err != nil {
 		errLogger.Println(err)
-		json.NewEncoder(w).Encode(nil)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(obj)
@@ -208,6 +208,8 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	obj, err := repoCover(vars["repo"], tag)
 	if err != nil {
 		errLogger.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
@@ -257,6 +259,7 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	obj, err := repoCover(repo, tag)
 	if err != nil {
 		errLogger.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -279,9 +282,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		errLogger.Println(err)
 	}
 
-	homeTmpl.Execute(w, map[string]interface{}{
+	err = homeTmpl.Execute(w, map[string]interface{}{
 		"repositories": repos,
 	})
+	if err != nil {
+		errLogger.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func main() {

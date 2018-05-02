@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/mux"
 )
 
 func TestImageSupported(t *testing.T) {
@@ -34,7 +39,7 @@ func TestGetBadge(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	_, stderr, err := run("avelino/cover.run", "golang-1.10", "github.com/bnkamalesh/webgo")
+	_, stderr, err := run("avelino/cover.run", "golang-1.10", "github.com/avelino/cover.run")
 	if err != nil {
 		t.Log(err)
 		t.Fail()
@@ -48,7 +53,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestRepoCover(t *testing.T) {
-	_, err := repoCover("github.com/bnkamalesh/webgo", "golang-1.10")
+	_, err := repoCover("github.com/avelino/cover.run", "golang-1.10")
 	if err != nil {
 		t.Log(err)
 		t.Fail()
@@ -59,6 +64,82 @@ func TestRepoLatest(t *testing.T) {
 	_, err := repoLatest()
 	if err != nil {
 		t.Log(err)
+		t.Fail()
+	}
+}
+
+func setup() (*mux.Router, *httptest.ResponseRecorder) {
+	r := mux.NewRouter()
+	r.HandleFunc("/", Handler)
+	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
+	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
+	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
+	return r, httptest.NewRecorder()
+}
+func TestHandler(t *testing.T) {
+	router, respRec := setup()
+	url := "http://localhost/"
+
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	router.ServeHTTP(respRec, req)
+
+	if respRec.Code != 200 {
+		t.Log("Expected 200, got", respRec.Code)
+		t.Fail()
+	}
+}
+
+func TestHandlerRepoJSON(t *testing.T) {
+	router, respRec := setup()
+	url := "http://localhost/go/github.com/avelino/cover.run.json?tag=golang-1.10"
+
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	router.ServeHTTP(respRec, req)
+
+	if respRec.Code != 200 {
+		t.Log("Expected 200, got", respRec.Code)
+		t.Fail()
+	}
+}
+
+func TestHandlerRepoSVG(t *testing.T) {
+	router, respRec := setup()
+	url := "http://localhost/go/github.com/avelino/cover.run.svg?tag=golang-1.10"
+
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	router.ServeHTTP(respRec, req)
+
+	if respRec.Code != 200 {
+		t.Log("Expected 200, got", respRec.Code)
+		t.Fail()
+	}
+}
+
+func TestHandlerRepo(t *testing.T) {
+	router, respRec := setup()
+	url := "http://localhost/go/github.com/avelino/cover.run?tag=golang-1.10"
+
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	router.ServeHTTP(respRec, req)
+
+	if respRec.Code != 200 {
+		t.Log("Expected 200, got", respRec.Code)
 		t.Fail()
 	}
 }
