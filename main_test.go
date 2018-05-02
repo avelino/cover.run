@@ -50,6 +50,18 @@ func TestRun(t *testing.T) {
 		t.Log(stderr)
 		t.Fail()
 	}
+
+	_, _, err = run("avelino/cover.run", "golang-1.0", "github.com/avelino/cover.run")
+	if err.Error() != "missing remote repository e.g. 'github.com/user/repo'" {
+		t.Log(err)
+		t.Fail()
+	}
+
+	_, _, err = run("avelino/cover.run", "golang-1.10", "github.com/avelino/nonexistent")
+	if err.Error() != "provision: container exited with failure" {
+		t.Log("Expected 'provision: container exited with failure'. got", err)
+		t.Fail()
+	}
 }
 
 func TestRepoCover(t *testing.T) {
@@ -58,15 +70,27 @@ func TestRepoCover(t *testing.T) {
 		t.Log(err)
 		t.Fail()
 	}
-}
 
-func TestRepoLatest(t *testing.T) {
-	_, err := repoLatest()
-	if err != nil {
-		t.Log(err)
+	_, err = repoCover("github.com/avelino/cover.run", "golang-1.0.1")
+	if err != ErrImgUnSupported {
+		t.Log("Expected error ", ErrImgUnSupported, "got", err)
+		t.Fail()
+	}
+
+	_, err = repoCover("github.com/avelino/nonexistent", "golang-1.10")
+	if err.Error() != "provision: container exited with failure" {
+		t.Log("Expected 'provision: container exited with failure'. got", err)
 		t.Fail()
 	}
 }
+
+// func TestRepoLatest(t *testing.T) {
+// 	_, err := repoLatest()
+// 	if err != nil {
+// 		t.Log(err)
+// 		t.Fail()
+// 	}
+// }
 
 func setup() (*mux.Router, *httptest.ResponseRecorder) {
 	r := mux.NewRouter()
