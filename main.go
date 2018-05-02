@@ -28,7 +28,8 @@ var (
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
 
 	httpClient = &http.Client{
-		Timeout: 4 * time.Second,
+		// img.shields.io response time is very slow
+		Timeout: 30 * time.Second,
 	}
 
 	// ErrImgUnSupported is the error returned when the Go version requested is
@@ -77,6 +78,34 @@ func imageSupported(tag string) bool {
 	return false
 }
 
+func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+	buildOpts := &provision.BuildOptions{
+		DoNotUsePrefixImageName: true,
+		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
+		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
+	}
+
+	StdOut, StdErr, err := gofn.Run(buildOpts, &provision.ContainerOptions{})
+	if err != nil {
+		errLogger.Println(err, buildOpts)
+	}
+
+	return StdOut, StdErr, err
+}
+
+// getBadge gets the badge from img.shields.io and return as []byte
+func getBadge(color, style, percent string) ([]byte, error) {
+	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
+
+	resp, err := httpClient.Get(imgURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
+}
+
 // Object struct holds all the details of a repository
 type Object struct {
 	Repo   string
@@ -116,21 +145,6 @@ func repoCover(repo, imageTag string) (*Object, error) {
 	return obj, nil
 }
 
-// HandlerRepoJSON returns the coverage details of a repository as JSON
-func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
-	}
-	obj, err := repoCover(vars["repo"], tag)
-	if err != nil {
-		json.NewEncoder(w).Encode(obj)
-		return
-	}
-	json.NewEncoder(w).Encode(obj)
-}
-
 type Repository struct {
 	Repo  string
 	Tag   string
@@ -159,6 +173,22 @@ func repoLatest() ([]*Repository, error) {
 	return repos, nil
 }
 
+// HandlerRepoJSON returns the coverage details of a repository as JSON
+func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	tag := r.URL.Query().Get("tag")
+	if tag == "" {
+		tag = DefaultTag
+	}
+	obj, err := repoCover(vars["repo"], tag)
+	if err != nil {
+		errLogger.Println(err)
+		json.NewEncoder(w).Encode(nil)
+		return
+	}
+	json.NewEncoder(w).Encode(obj)
+}
+
 func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
 	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
@@ -177,6 +207,9 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	obj, err := repoCover(vars["repo"], tag)
+	if err != nil {
+		errLogger.Println(err)
+	}
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
 	if cover >= 70 {
@@ -224,8 +257,10 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 
 	obj, err := repoCover(repo, tag)
 	if err != nil {
+		errLogger.Println(err)
 		return
 	}
+
 	repos, err := repoLatest()
 	if err != nil {
 		errLogger.Println(err)
@@ -261,32 +296,4 @@ func main() {
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 	n.UseHandler(r)
 	n.Run(":3000")
-}
-
-func run(imageRepoName, dockerTag, repo string) (string, string, error) {
-	buildOpts := &provision.BuildOptions{
-		DoNotUsePrefixImageName: true,
-		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
-		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
-	}
-
-	StdOut, StdErr, err := gofn.Run(buildOpts, &provision.ContainerOptions{})
-	if err != nil {
-		errLogger.Println(err, buildOpts)
-	}
-
-	return StdOut, StdErr, err
-}
-
-// getBadge gets the badge from img.shields.io and return as []byte
-func getBadge(color, style, percent string) ([]byte, error) {
-	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
-
-	resp, err := httpClient.Get(imgURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
