@@ -31,19 +31,15 @@ var (
 		// img.shields.io response time is very slow
 		Timeout: 30 * time.Second,
 	}
-
 	// ErrImgUnSupported is the error returned when the Go version requested is
 	// not in the supported list
 	ErrImgUnSupported = errors.New("Unsupported Go version provided")
-)
 
-var (
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": "redis:6379",
 		},
 	})
-
 	redisCodec = &cache.Codec{
 		Redis: redisRing,
 
@@ -54,9 +50,7 @@ var (
 			return msgpack.Unmarshal(b, v)
 		},
 	}
-)
 
-var (
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
 )
