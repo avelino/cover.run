@@ -148,13 +148,13 @@ func repoCover(repo, imageTag string) (*Object, error) {
 			obj.Cover = stdOut
 			obj.Output = true
 		}
-		err = redisCodec.Set(&cache.Item{
+		rerr := redisCodec.Set(&cache.Item{
 			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
 		})
-		if err != nil {
-			errLogger.Println(err)
+		if rerr != nil {
+			errLogger.Println(rerr)
 		}
 
 		return obj, err
