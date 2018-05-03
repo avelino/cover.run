@@ -84,14 +84,6 @@ func TestRepoCover(t *testing.T) {
 	}
 }
 
-// func TestRepoLatest(t *testing.T) {
-// 	_, err := repoLatest()
-// 	if err != nil {
-// 		t.Log(err)
-// 		t.Fail()
-// 	}
-// }
-
 func setup() (*mux.Router, *httptest.ResponseRecorder) {
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
