@@ -275,6 +275,24 @@
 			"revisionTime": "2017-04-03T08:08:46Z"
 		},
 		{
+			"checksumSHA1": "3q+okLTB5XGsp2QflIFc44QiJm0=",
+			"path": "github.com/gofn/gofn",
+			"revision": "f491cf2ea4659d47466934d8bd24598828f8a39f",
+			"revisionTime": "2018-04-17T20:19:49Z"
+		},
+		{
+			"checksumSHA1": "+scqvduMFSyw+dDnZHJBamaxaiw=",
+			"path": "github.com/gofn/gofn/iaas",
+			"revision": "f491cf2ea4659d47466934d8bd24598828f8a39f",
+			"revisionTime": "2018-04-17T20:19:49Z"
+		},
+		{
+			"checksumSHA1": "Nw+D+rZBQCcppcdM+rQuXRbXESg=",
+			"path": "github.com/gofn/gofn/provision",
+			"revision": "f491cf2ea4659d47466934d8bd24598828f8a39f",
+			"revisionTime": "2018-04-17T20:19:49Z"
+		},
+		{
 			"checksumSHA1": "s2E4fYDL3LeDZAnuN4+WNNsQxxk=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "0fd8c908d872c921af513ef5091964bbd2e0d904",
@@ -300,12 +318,6 @@
 			"revisionTime": "2017-05-13T16:02:19Z"
 		},
 		{
-			"checksumSHA1": "UH2VQq3lkiYxtbf2EgIssYyazhM=",
-			"path": "github.com/nuveo/gofn",
-			"revision": "8ccb8c0380c61e1fe8d56c6adf9eba9777563a7b",
-			"revisionTime": "2017-05-13T16:02:19Z"
-		},
-		{
 			"checksumSHA1": "aa4mIhS154LcIIxn3GeoAXEJ1A0=",
 			"path": "github.com/nuveo/gofn/iaas",
 			"revision": "8ccb8c0380c61e1fe8d56c6adf9eba9777563a7b",
@@ -316,6 +328,12 @@
 			"path": "github.com/nuveo/gofn/provision",
 			"revision": "8ccb8c0380c61e1fe8d56c6adf9eba9777563a7b",
 			"revisionTime": "2017-05-13T16:02:19Z"
+		},
+		{
+			"checksumSHA1": "yAwj2iuaBCWaaMp79SwTm2zOmG4=",
+			"path": "github.com/nuveo/log",
+			"revision": "526558130f8bfa97328e11116b246eff7563274a",
+			"revisionTime": "2017-12-04T12:30:40Z"
 		},
 		{
 			"checksumSHA1": "Ssz9STAL5P2+1poiM63klFjhqhE=",
@@ -332,11 +350,10 @@
 			"revisionTime": "2017-05-13T16:02:19Z"
 		},
 		{
-			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
-			"origin": "github.com/nuveo/gofn/vendor/github.com/satori/go.uuid",
+			"checksumSHA1": "eDQ6f1EsNf+frcRO/9XukSEchm8=",
 			"path": "github.com/satori/go.uuid",
-			"revision": "8ccb8c0380c61e1fe8d56c6adf9eba9777563a7b",
-			"revisionTime": "2017-05-13T16:02:19Z"
+			"revision": "36e9d2ebbde5e3f13ab2e25625fd453271d6522e",
+			"revisionTime": "2018-01-03T17:44:51Z"
 		},
 		{
 			"checksumSHA1": "MJw194u4PprQAabBORjIp1tPUwM=",

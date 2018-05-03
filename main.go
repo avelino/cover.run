@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,9 +19,9 @@ import (
 
 	"github.com/go-redis/cache"
 	"github.com/go-redis/redis"
+	"github.com/gofn/gofn"
+	"github.com/gofn/gofn/provision"
 	"github.com/gorilla/mux"
-	"github.com/nuveo/gofn"
-	"github.com/nuveo/gofn/provision"
 	"github.com/urfave/negroni"
 )
 
@@ -79,7 +80,11 @@ func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
 
-	StdOut, StdErr, err := gofn.Run(buildOpts, &provision.ContainerOptions{})
+	// 5 minutes timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+
+	StdOut, StdErr, err := gofn.Run(ctx, buildOpts, &provision.ContainerOptions{})
 	if err != nil {
 		errLogger.Println(err, buildOpts)
 	}
