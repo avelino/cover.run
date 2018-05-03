@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,14 +15,13 @@ import (
 	"strings"
 	"time"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/go-redis/cache"
 	"github.com/go-redis/redis"
+	"github.com/gofn/gofn"
+	"github.com/gofn/gofn/provision"
 	"github.com/gorilla/mux"
-	"github.com/nuveo/gofn"
-	"github.com/nuveo/gofn/provision"
 	"github.com/urfave/negroni"
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
 var (
@@ -34,6 +34,10 @@ var (
 	// ErrImgUnSupported is the error returned when the Go version requested is
 	// not in the supported list
 	ErrImgUnSupported = errors.New("Unsupported Go version provided")
+	// ErrRepoNotFound is the error returned when the repository does not exist
+	ErrRepoNotFound = errors.New("Repository not found")
+	// ErrUnknown is the error returned when an unidentified error is encountered
+	ErrUnknown = errors.New("Unknown error occurred")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -73,15 +77,31 @@ func imageSupported(tag string) bool {
 }
 
 func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+	resp, err := httpClient.Get(fmt.Sprintf("https://%s", repo))
+	if err != nil {
+		return "", "", err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return "", "", ErrRepoNotFound
+	}
+
+	if resp.StatusCode > 399 {
+		return "", "", ErrUnknown
+	}
+
 	buildOpts := &provision.BuildOptions{
 		DoNotUsePrefixImageName: true,
 		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
 		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
 
-	StdOut, StdErr, err := gofn.Run(buildOpts, &provision.ContainerOptions{})
+	// 5 minutes timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+
+	StdOut, StdErr, err := gofn.Run(ctx, buildOpts, &provision.ContainerOptions{})
 	if err != nil {
-		errLogger.Println(err, buildOpts)
+		errLogger.Println(err)
 	}
 
 	return StdOut, StdErr, err
@@ -96,6 +116,7 @@ func getBadge(color, style, percent string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 }
 
@@ -127,11 +148,14 @@ func repoCover(repo, imageTag string) (*Object, error) {
 			obj.Cover = stdOut
 			obj.Output = true
 		}
-		redisCodec.Set(&cache.Item{
+		rerr := redisCodec.Set(&cache.Item{
 			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
 		})
+		if rerr != nil {
+			errLogger.Println(rerr)
+		}
 
 		return obj, err
 	}

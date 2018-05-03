@@ -58,8 +58,8 @@ func TestRun(t *testing.T) {
 	}
 
 	_, _, err = run("avelino/cover.run", "golang-1.10", "github.com/avelino/nonexistent")
-	if err.Error() != "provision: container exited with failure" {
-		t.Log("Expected 'provision: container exited with failure'. got", err)
+	if err != ErrRepoNotFound {
+		t.Log("Expected", ErrRepoNotFound, "got", err)
 		t.Fail()
 	}
 }
@@ -78,8 +78,8 @@ func TestRepoCover(t *testing.T) {
 	}
 
 	_, err = repoCover("github.com/avelino/nonexistent", "golang-1.10")
-	if err.Error() != "provision: container exited with failure" {
-		t.Log("Expected 'provision: container exited with failure'. got", err)
+	if err != ErrRepoNotFound {
+		t.Log("Expected", ErrRepoNotFound, "got", err)
 		t.Fail()
 	}
 }
