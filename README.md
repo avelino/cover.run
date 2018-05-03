@@ -1,5 +1,5 @@
 # cover.run
-Code coverage
+[![Build Status](https://travis-ci.org/avelino/cover.run.svg?branch=master)](https://travis-ci.org/avelino/cover.run)
 
 ## Supported
 
