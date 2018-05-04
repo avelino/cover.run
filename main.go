@@ -12,6 +12,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/cache"
@@ -23,8 +25,29 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
+const (
+	// coverQMax is the maximum number of coverage run to be executed simultaneously
+	coverQMax = 5
+
+	// DefaultTag is the Go version to run the tests with when no version
+	// is specified
+	DefaultTag = "golang-1.10"
+
+	// errorBadgeCurve is the SVG badge returned when coverage badge could not be returned
+	errorBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="100" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/><path fill="url(#b)" d="M0 0h100v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="290">failed</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
+	errorBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
+
+	// progressBadgeCurve is the SVG badge returned when coverage run is in progress
+	queuedBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">inqueue</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
+	queuedBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
+)
+
 var (
+	// errLogger is the log instance with all the required flags set for error logging
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
+
+	// coverQCur is the current number of cover run requests being executed
+	coverQCur = int32(0)
 
 	httpClient = &http.Client{
 		// img.shields.io response time is very slow
@@ -55,23 +78,18 @@ var (
 			return msgpack.Unmarshal(b, v)
 		},
 	}
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:         "redis:6379",
+		ReadTimeout:  time.Second * 2,
+		DialTimeout:  time.Second * 5,
+		WriteTimeout: time.Second * 5,
+		PoolTimeout:  time.Second * 120,
+	})
+	qLock = sync.Mutex{}
+	qChan = make(chan struct{}, coverQMax)
 
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
-)
-
-const (
-	// DefaultTag is the Go version to run the tests with when no version
-	// is specified
-	DefaultTag = "golang-1.10"
-
-	// errorBadgeCurve is the SVG badge returned when coverage badge could not be returned
-	errorBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="100" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/><path fill="url(#b)" d="M0 0h100v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="290">failed</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-	errorBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-
-	// progressBadgeCurve is the SVG badge returned when coverage run is in progress
-	queuedBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">inqueue</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
-	queuedBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
 )
 
 // imageSupported returns true if the given Go version is supported
@@ -146,6 +164,88 @@ type Object struct {
 	Output bool
 }
 
+func getQMsg(repo, tag string) string {
+	return fmt.Sprintf("%s:%s", repo, tag)
+}
+
+func getRepoTagFromMsg(msg string) (string, string) {
+	parts := strings.Split(msg, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "", ""
+}
+
+func addToQ(repo, tag string) error {
+	qLock.Lock()
+	err := redisClient.Publish("coverQueue", getQMsg(repo, tag)).Err()
+	qLock.Unlock()
+	return err
+}
+
+func processQ(qname string) {
+	pubsub, err := redisClient.Subscribe(qname)
+	defer pubsub.Close()
+	if err != nil {
+		errLogger.Println(err)
+		return
+	}
+
+	err = redisClient.Publish("mychannel1", "hello").Err()
+	if err != nil {
+		errLogger.Println(err)
+		return
+	}
+
+	msg, err := pubsub.ReceiveMessage()
+	if err != nil {
+		errLogger.Println(err)
+		return
+	}
+
+	// Check if cover run is already in progress for the given repo and tag
+	if redisRing.HGet("cover-in-progress", msg.String()).Err() == nil {
+		return
+	}
+
+	// Set the repo + tag as in progress to prevent the same repo+tag clogging the Q
+	if redisRing.HSet("cover-in-progress", msg.String(), true).Err() != nil {
+		errLogger.Println(err)
+	}
+
+	repo, tag := getRepoTagFromMsg(msg.String())
+	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
+	if err != nil {
+		errLogger.Println(err)
+	}
+
+	if redisRing.HDel("cover-in-progress", msg.String()).Err() != nil {
+		errLogger.Println(err)
+	}
+
+	obj := &Object{}
+	stdOut := strings.Trim(StdOut, " \n")
+	obj.Cover = StdErr
+	obj.Output = false
+	if stdOut != "" {
+		obj.Cover = stdOut
+		obj.Output = true
+	}
+	cacheKey := fmt.Sprintf("%s-%s", repo, tag)
+	err = redisCodec.Set(&cache.Item{
+		Key:        cacheKey,
+		Object:     obj,
+		Expiration: time.Hour,
+	})
+
+	if err != nil {
+		errLogger.Println(err)
+	}
+	if coverQCur > -1 {
+		atomic.AddInt32(&coverQCur, -1)
+	}
+}
+
 // repoCover returns code coverage details for the given repository and Go version
 func repoCover(repo, imageTag string) (*Object, error) {
 	obj := &Object{}
@@ -157,8 +257,27 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		return obj, ErrImgUnSupported
 	}
 
-	if err := redisCodec.Get(cacheKey, &obj); err != nil {
+	if redisCodec.Get(cacheKey, &obj) == nil {
+		return obj, nil
+	}
+
+	if coverQCur >= coverQMax {
+		err := addToQ(repo, imageTag)
+		if err != nil {
+			errLogger.Println(err)
+		}
+
+		return nil, ErrQueueFull
+	}
+
+	atomic.AddInt32(&coverQCur, 1)
+	go func() {
 		StdOut, StdErr, err := run("avelino/cover.run", imageTag, repo)
+		if err != nil {
+			errLogger.Println(err)
+		}
+
+		obj := &Object{}
 		stdOut := strings.Trim(StdOut, " \n")
 		obj.Cover = StdErr
 		obj.Output = false
@@ -166,18 +285,20 @@ func repoCover(repo, imageTag string) (*Object, error) {
 			obj.Cover = stdOut
 			obj.Output = true
 		}
-		rerr := redisCodec.Set(&cache.Item{
+		err = redisCodec.Set(&cache.Item{
 			Key:        cacheKey,
 			Object:     obj,
 			Expiration: time.Hour,
 		})
-		if rerr != nil {
-			errLogger.Println(rerr)
+		if err != nil {
+			errLogger.Println(err)
 		}
+		if coverQCur > -1 {
+			atomic.AddInt32(&coverQCur, -1)
+		}
+	}()
 
-		return obj, err
-	}
-	return obj, nil
+	return nil, nil
 }
 
 type Repository struct {
