@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -38,6 +37,8 @@ var (
 	ErrRepoNotFound = errors.New("Repository not found")
 	// ErrUnknown is the error returned when an unidentified error is encountered
 	ErrUnknown = errors.New("Unknown error occurred")
+	// ErrQueueFull is the error returned when the cover run queueu is full
+	ErrQueueFull = errors.New("Cover run queue is full")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -63,8 +64,17 @@ const (
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
 	DefaultTag = "golang-1.10"
+
+	// errorBadgeCurve is the SVG badge returned when coverage badge could not be returned
+	errorBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="100" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/><path fill="url(#b)" d="M0 0h100v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="290">failed</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
+	errorBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
+
+	// progressBadgeCurve is the SVG badge returned when coverage run is in progress
+	queuedBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">inqueue</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
+	queuedBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
 )
 
+// imageSupported returns true if the given Go version is supported
 func imageSupported(tag string) bool {
 	switch tag {
 	case
@@ -76,17 +86,25 @@ func imageSupported(tag string) bool {
 	return false
 }
 
-func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+func repoExists(repo string) (bool, error) {
 	resp, err := httpClient.Get(fmt.Sprintf("https://%s", repo))
 	if err != nil {
-		return "", "", err
+		return false, err
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return "", "", ErrRepoNotFound
+		return false, ErrRepoNotFound
 	}
 
 	if resp.StatusCode > 399 {
-		return "", "", ErrUnknown
+		return false, ErrUnknown
+	}
+	return false, nil
+}
+
+func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+	_, err := repoExists(repo)
+	if err != nil {
+		return "", "", err
 	}
 
 	buildOpts := &provision.BuildOptions{
@@ -190,45 +208,24 @@ func repoLatest() ([]*Repository, error) {
 	return repos, nil
 }
 
-// HandlerRepoJSON returns the coverage details of a repository as JSON
-func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
-	}
-	obj, err := repoCover(vars["repo"], tag)
+// coverageBadge returns the SVG badge after computing the coverage
+func coverageBadge(repo, tag, style string) (string, error) {
+	obj, err := repoCover(repo, tag)
 	if err != nil {
+		if err == ErrQueueFull {
+			if style == "flat-square" {
+				return queuedBadgeFlat, nil
+			}
+			return queuedBadgeCurve, nil
+		}
+
 		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(obj)
-}
-
-func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
-	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
-	w.Header().Set("pragma", "no-cache")
-	w.Header().Set("expires", "-1")
-
-	vars := mux.Vars(r)
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
+		if style == "flat-square" {
+			return errorBadgeFlat, err
+		}
+		return errorBadgeCurve, err
 	}
 
-	badgeStyle := r.URL.Query().Get("style")
-	if badgeStyle != "flat" {
-		badgeStyle = "flat-square"
-	}
-
-	obj, err := repoCover(vars["repo"], tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	var color string
 	if cover >= 70 {
@@ -239,18 +236,20 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		color = "red"
 	}
 
-	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
+	badgeName := fmt.Sprintf("%s%s%s", color, style, obj.Cover)
 	svg, err := redisRing.Get(badgeName).Bytes()
 	if err != nil {
 		if err != redis.Nil {
 			errLogger.Println(err)
 		}
 
-		svg, err = getBadge(color, badgeStyle, obj.Cover)
+		svg, err = getBadge(color, style, obj.Cover)
 		if err != nil {
 			errLogger.Println(err)
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
+			if style == "flat-square" {
+				return errorBadgeFlat, err
+			}
+			return errorBadgeCurve, err
 		}
 
 		go func() {
@@ -261,52 +260,10 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
-	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
-	w.Header().Set("Content-Encoding", "br")
-	w.Write(svg)
-}
-
-func HandlerRepo(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	repo := vars["repo"]
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
+	if style == "flat-square" {
+		return queuedBadgeFlat, nil
 	}
-
-	obj, err := repoCover(repo, tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	repos, err := repoLatest()
-	if err != nil {
-		errLogger.Println(err)
-	}
-
-	repoTmpl.Execute(w, map[string]interface{}{
-		"Repo":         repo,
-		"Cover":        obj.Cover,
-		"Tag":          obj.Tag,
-		"repositories": repos,
-	})
-}
-
-func Handler(w http.ResponseWriter, r *http.Request) {
-	repos, err := repoLatest()
-	if err != nil {
-		errLogger.Println(err)
-	}
-
-	err = homeTmpl.Execute(w, map[string]interface{}{
-		"repositories": repos,
-	})
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	return queuedBadgeCurve, nil
 }
 
 func main() {
