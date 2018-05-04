@@ -27,19 +27,14 @@ import (
 
 const (
 	// coverQMax is the maximum number of coverage run to be executed simultaneously
-	coverQMax = 5
+	coverQMax = 0
+
+	// inProgrsKey is the redis HSet key in which all repo + tags are saved
+	inProgrsKey = "cover-in-progress"
 
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
 	DefaultTag = "golang-1.10"
-
-	// errorBadgeCurve is the SVG badge returned when coverage badge could not be returned
-	errorBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="100" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/><path fill="url(#b)" d="M0 0h100v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="290">failed</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-	errorBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-
-	// progressBadgeCurve is the SVG badge returned when coverage run is in progress
-	queuedBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">inqueue</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
-	queuedBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
 )
 
 var (
@@ -62,6 +57,9 @@ var (
 	ErrUnknown = errors.New("Unknown error occurred")
 	// ErrQueueFull is the error returned when the cover run queueu is full
 	ErrQueueFull = errors.New("Cover run queue is full")
+
+	// ErrCovInProgrs is the error returned when the repo coverage test is in progress
+	ErrCovInPrgrs = errors.New("Cover run is in progress")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -104,6 +102,7 @@ func imageSupported(tag string) bool {
 	return false
 }
 
+// repoExists checks if the given repository exists (worksing only if HTTP request returns 200)
 func repoExists(repo string) (bool, error) {
 	resp, err := httpClient.Get(fmt.Sprintf("https://%s", repo))
 	if err != nil {
@@ -119,6 +118,7 @@ func repoExists(repo string) (bool, error) {
 	return false, nil
 }
 
+// run runs the custom script to get the coverage details; using gofn
 func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 	_, err := repoExists(repo)
 	if err != nil {
@@ -164,10 +164,13 @@ type Object struct {
 	Output bool
 }
 
+// getQMsg gets the message to be send to the Redis channel
 func getQMsg(repo, tag string) string {
 	return fmt.Sprintf("%s:%s", repo, tag)
 }
 
+// getRepoTagFromMsg returns the repo name and Go tag from the message received from
+// Redis channel
 func getRepoTagFromMsg(msg string) (string, string) {
 	parts := strings.Split(msg, ":")
 	if len(parts) == 2 {
@@ -176,6 +179,7 @@ func getRepoTagFromMsg(msg string) (string, string) {
 	return "", ""
 }
 
+// addToQ pushes a new cover run request to the Redis channel
 func addToQ(repo, tag string) error {
 	qLock.Lock()
 	err := redisClient.Publish("coverQueue", getQMsg(repo, tag)).Err()
@@ -183,7 +187,28 @@ func addToQ(repo, tag string) error {
 	return err
 }
 
-func processQ(qname string) {
+// checkInProgress returns true if a repository + tag cover run is in progress
+func checkInProgress(repo, tag string) (bool, error) {
+	// Check if cover run is already in progress for the given repo and tag
+	err := redisRing.HGet(inProgrsKey, getQMsg(repo, tag)).Err()
+	if err == nil {
+		return true, nil
+	}
+	return false, err
+}
+
+// setInProgress sets the repo + tag as in progress
+func setInProgress(repo, tag string) error {
+	// Set the repo + tag as in progress to prevent the same repo+tag clogging the Q
+	err := redisRing.HSet(inProgrsKey, getQMsg(repo, tag), "y").Err()
+	if err != nil {
+		errLogger.Println(err)
+	}
+	return err
+}
+
+// qSubscribe subscribes to the Redis channel
+func qSubscribe(qname string) {
 	pubsub, err := redisClient.Subscribe(qname)
 	defer pubsub.Close()
 	if err != nil {
@@ -197,47 +222,54 @@ func processQ(qname string) {
 		return
 	}
 
-	msg, err := pubsub.ReceiveMessage()
+	for {
+		msg, err := pubsub.ReceiveMessage()
+		if err != nil {
+			errLogger.Println(err)
+			return
+		}
+		repo, tag := getRepoTagFromMsg(msg.Payload)
+		if ok, _ := checkInProgress(repo, tag); !ok {
+			cover(repo, tag)
+		}
+	}
+}
+
+func cover(repo, tag string) {
+	atomic.AddInt32(&coverQCur, 1)
+
+	err := setInProgress(repo, tag)
 	if err != nil {
 		errLogger.Println(err)
-		return
 	}
 
-	// Check if cover run is already in progress for the given repo and tag
-	if redisRing.HGet("cover-in-progress", msg.String()).Err() == nil {
-		return
-	}
-
-	// Set the repo + tag as in progress to prevent the same repo+tag clogging the Q
-	if redisRing.HSet("cover-in-progress", msg.String(), true).Err() != nil {
-		errLogger.Println(err)
-	}
-
-	repo, tag := getRepoTagFromMsg(msg.String())
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
 	if err != nil {
 		errLogger.Println(err)
 	}
 
-	if redisRing.HDel("cover-in-progress", msg.String()).Err() != nil {
+	cacheKey := getQMsg(repo, tag)
+
+	if err := redisRing.HDel(inProgrsKey, cacheKey).Err(); err != nil {
 		errLogger.Println(err)
 	}
 
-	obj := &Object{}
+	obj := &Object{
+		Cover:  StdErr,
+		Output: false,
+	}
+
 	stdOut := strings.Trim(StdOut, " \n")
-	obj.Cover = StdErr
-	obj.Output = false
 	if stdOut != "" {
 		obj.Cover = stdOut
 		obj.Output = true
 	}
-	cacheKey := fmt.Sprintf("%s-%s", repo, tag)
+
 	err = redisCodec.Set(&cache.Item{
 		Key:        cacheKey,
 		Object:     obj,
 		Expiration: time.Hour,
 	})
-
 	if err != nil {
 		errLogger.Println(err)
 	}
@@ -248,17 +280,22 @@ func processQ(qname string) {
 
 // repoCover returns code coverage details for the given repository and Go version
 func repoCover(repo, imageTag string) (*Object, error) {
-	obj := &Object{}
-	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
-	obj.Repo = repo
-	obj.Tag = imageTag
+	obj := &Object{
+		Repo: repo,
+		Tag:  imageTag,
+	}
+
+	if redisCodec.Get(getQMsg(repo, imageTag), &obj) == nil {
+		return obj, nil
+	}
+
 	if !imageSupported(imageTag) {
 		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
 		return obj, ErrImgUnSupported
 	}
 
-	if redisCodec.Get(cacheKey, &obj) == nil {
-		return obj, nil
+	if ok, _ := checkInProgress(repo, imageTag); ok {
+		return obj, ErrCovInPrgrs
 	}
 
 	if coverQCur >= coverQMax {
@@ -266,39 +303,12 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		if err != nil {
 			errLogger.Println(err)
 		}
-
-		return nil, ErrQueueFull
+		return obj, ErrQueueFull
 	}
 
-	atomic.AddInt32(&coverQCur, 1)
-	go func() {
-		StdOut, StdErr, err := run("avelino/cover.run", imageTag, repo)
-		if err != nil {
-			errLogger.Println(err)
-		}
+	go cover(repo, imageTag)
 
-		obj := &Object{}
-		stdOut := strings.Trim(StdOut, " \n")
-		obj.Cover = StdErr
-		obj.Output = false
-		if stdOut != "" {
-			obj.Cover = stdOut
-			obj.Output = true
-		}
-		err = redisCodec.Set(&cache.Item{
-			Key:        cacheKey,
-			Object:     obj,
-			Expiration: time.Hour,
-		})
-		if err != nil {
-			errLogger.Println(err)
-		}
-		if coverQCur > -1 {
-			atomic.AddInt32(&coverQCur, -1)
-		}
-	}()
-
-	return nil, nil
+	return obj, ErrCovInPrgrs
 }
 
 type Repository struct {
@@ -338,6 +348,13 @@ func coverageBadge(repo, tag, style string) (string, error) {
 				return queuedBadgeFlat, nil
 			}
 			return queuedBadgeCurve, nil
+		}
+
+		if err == ErrCovInPrgrs {
+			if style == "flat-square" {
+				return progressBadgeFlat, nil
+			}
+			return progressBadgeCurve, nil
 		}
 
 		errLogger.Println(err)
@@ -380,11 +397,7 @@ func coverageBadge(repo, tag, style string) (string, error) {
 			}
 		}()
 	}
-
-	if style == "flat-square" {
-		return queuedBadgeFlat, nil
-	}
-	return queuedBadgeCurve, nil
+	return string(svg), nil
 }
 
 func main() {
@@ -397,5 +410,6 @@ func main() {
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 	n.UseHandler(r)
+	go qSubscribe("coverQueue")
 	n.Run(":3000")
 }

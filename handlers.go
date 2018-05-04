@@ -15,12 +15,15 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 		tag = DefaultTag
 	}
 	obj, err := repoCover(vars["repo"], tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err == nil || err == ErrCovInPrgrs || err == ErrQueueFull {
+		json.NewEncoder(w).Encode(obj)
 		return
 	}
-	json.NewEncoder(w).Encode(obj)
+
+	if err != ErrCovInPrgrs && err != ErrQueueFull {
+		errLogger.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandlerRepoSVG returns the SVG badge with coverage for a given repository
@@ -58,23 +61,24 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	obj, err := repoCover(repo, tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err == nil || err == ErrCovInPrgrs || err == ErrQueueFull {
+		repos, err := repoLatest()
+		if err != nil {
+			errLogger.Println(err)
+		}
+
+		repoTmpl.Execute(w, map[string]interface{}{
+			"Repo":         repo,
+			"Cover":        obj.Cover,
+			"Tag":          obj.Tag,
+			"repositories": repos,
+		})
 		return
 	}
 
-	repos, err := repoLatest()
-	if err != nil {
-		errLogger.Println(err)
-	}
+	errLogger.Println(err)
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 
-	repoTmpl.Execute(w, map[string]interface{}{
-		"Repo":         repo,
-		"Cover":        obj.Cover,
-		"Tag":          obj.Tag,
-		"repositories": repos,
-	})
 }
 
 // Handler returns the homepage
