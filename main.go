@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -41,13 +39,14 @@ var (
 	// errLogger is the log instance with all the required flags set for error logging
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
 
-	// coverQCur is the current number of cover run requests being executed
+	// coverQCur is the current number of cover run requests being executed simultaneously
 	coverQCur = int32(0)
 
 	httpClient = &http.Client{
 		// img.shields.io response time is very slow
 		Timeout: 30 * time.Second,
 	}
+
 	// ErrImgUnSupported is the error returned when the Go version requested is
 	// not in the supported list
 	ErrImgUnSupported = errors.New("Unsupported Go version provided")
@@ -57,8 +56,7 @@ var (
 	ErrUnknown = errors.New("Unknown error occurred")
 	// ErrQueueFull is the error returned when the cover run queueu is full
 	ErrQueueFull = errors.New("Cover run queue is full")
-
-	// ErrCovInProgrs is the error returned when the repo coverage test is in progress
+	// ErrCovInPrgrs is the error returned when the repo coverage test is in progress
 	ErrCovInPrgrs = errors.New("Cover run is in progress")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
@@ -143,19 +141,6 @@ func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 	return StdOut, StdErr, err
 }
 
-// getBadge gets the badge from img.shields.io and return as []byte
-func getBadge(color, style, percent string) ([]byte, error) {
-	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
-
-	resp, err := httpClient.Get(imgURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
-}
-
 // Object struct holds all the details of a repository
 type Object struct {
 	Repo   string
@@ -235,7 +220,7 @@ func qSubscribe(qname string) {
 	}
 }
 
-func cover(repo, tag string) {
+func cover(repo, tag string) error {
 	atomic.AddInt32(&coverQCur, 1)
 
 	err := setInProgress(repo, tag)
@@ -246,6 +231,7 @@ func cover(repo, tag string) {
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
 	if err != nil {
 		errLogger.Println(err)
+		return err
 	}
 
 	cacheKey := getQMsg(repo, tag)
@@ -276,6 +262,7 @@ func cover(repo, tag string) {
 	if coverQCur > -1 {
 		atomic.AddInt32(&coverQCur, -1)
 	}
+	return nil
 }
 
 // repoCover returns code coverage details for the given repository and Go version
@@ -374,30 +361,7 @@ func coverageBadge(repo, tag, style string) (string, error) {
 		color = "red"
 	}
 
-	badgeName := fmt.Sprintf("%s%s%s", color, style, obj.Cover)
-	svg, err := redisRing.Get(badgeName).Bytes()
-	if err != nil {
-		if err != redis.Nil {
-			errLogger.Println(err)
-		}
-
-		svg, err = getBadge(color, style, obj.Cover)
-		if err != nil {
-			errLogger.Println(err)
-			if style == "flat-square" {
-				return errorBadgeFlat, err
-			}
-			return errorBadgeCurve, err
-		}
-
-		go func() {
-			err := redisRing.Set(badgeName, svg, 0).Err()
-			if err != nil {
-				errLogger.Println(err)
-			}
-		}()
-	}
-	return string(svg), nil
+	return getBadge(color, style, obj.Cover), nil
 }
 
 func main() {

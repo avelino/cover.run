@@ -27,13 +27,9 @@ func TestImageSupported(t *testing.T) {
 
 func TestGetBadge(t *testing.T) {
 	expected := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="104" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="104" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h43v20H61z"/><path fill="url(#b)" d="M0 0h104v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="815" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="330">100%</text><text x="815" y="140" transform="scale(.1)" textLength="330">100%</text></g> </svg>`
-	bytes, err := getBadge("red", "flat", "100%")
-	if err != nil {
-		t.Log(err)
-		t.Fail()
-	}
-	if string(bytes) != expected {
-		t.Log("Expected svg badge, got", string(bytes))
+	str := getBadge("red", "flat", "100%")
+	if str != expected {
+		t.Log("Expected svg badge, got", str)
 		t.Fail()
 	}
 }
@@ -66,7 +62,7 @@ func TestRun(t *testing.T) {
 
 func TestRepoCover(t *testing.T) {
 	_, err := repoCover("github.com/avelino/cover.run", "golang-1.10")
-	if err != nil {
+	if err != nil && err != ErrCovInPrgrs && err != ErrQueueFull {
 		t.Log(err)
 		t.Fail()
 	}
@@ -78,6 +74,25 @@ func TestRepoCover(t *testing.T) {
 	}
 
 	_, err = repoCover("github.com/avelino/nonexistent", "golang-1.10")
+	if err != ErrRepoNotFound && err != ErrCovInPrgrs && err != ErrQueueFull {
+		t.Log("Expected", ErrRepoNotFound, "got", err)
+		t.Fail()
+	}
+}
+func TestCover(t *testing.T) {
+	err := cover("github.com/avelino/cover.run", "golang-1.10")
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+
+	err = cover("github.com/avelino/cover.run", "golang-1.0.1")
+	if err == nil {
+		t.Log("Expected error ", "got", err)
+		t.Fail()
+	}
+
+	err = cover("github.com/avelino/nonexistent", "golang-1.10")
 	if err != ErrRepoNotFound {
 		t.Log("Expected", ErrRepoNotFound, "got", err)
 		t.Fail()
