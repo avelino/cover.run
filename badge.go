@@ -16,18 +16,6 @@ const (
 	// Badge templates to generate badges
 	curveBadge = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="{{.Width}}" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="{{.StatusX}}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="">{{.Status}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text></g> </svg>`
 	flatBadge  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="{{.Color}}" d="M61 0h57v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text></g> </svg>`
-
-	// errorBadge is the SVG badge returned when coverage badge could not be returned
-	errorBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="100" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/><path fill="url(#b)" d="M0 0h100v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="290">failed</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-	errorBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h39v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="795" y="140" transform="scale(.1)" textLength="290">failed</text></g> </svg>`
-
-	// progressBadge is the SVG badge returned when coverage run is in progress
-	progressBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="118" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="118" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#a4a61d" d="M61 0h57v20H61z"/><path fill="url(#b)" d="M0 0h118v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="885" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="470">progress</text><text x="885" y="140" transform="scale(.1)" textLength="470">progress</text></g> </svg>`
-	progressBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="118" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#a4a61d" d="M61 0h57v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="885" y="140" transform="scale(.1)" textLength="470">progress</text></g> </svg>`
-
-	// queuedBadge is the SVG badge returned when a cover run request is queued
-	queuedBadgeCurve = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">cover.run</text><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">inqueue</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
-	queuedBadgeFlat  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#9f9f9f" d="M61 0h53v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">cover.run</text><text x="865" y="140" transform="scale(.1)" textLength="430">inqueue</text></g> </svg>`
 )
 
 var (
@@ -174,24 +162,14 @@ func coverageBadge(repo, tag, style string) (string, error) {
 	obj, err := repoCover(repo, tag)
 	if err != nil {
 		if err == ErrQueueFull {
-			if style == "flat-square" {
-				return queuedBadgeFlat, nil
-			}
-			return queuedBadgeCurve, nil
+			return getBadge("lightgrey", style, "queued"), nil
 		}
 
 		if err == ErrCovInPrgrs {
-			if style == "flat-square" {
-				return progressBadgeFlat, nil
-			}
-			return progressBadgeCurve, nil
+			return getBadge("yellowgreen", style, "progress"), nil
 		}
 
 		errLogger.Println(err)
-		if style == "flat-square" {
-			return errorBadgeFlat, err
-		}
-		return errorBadgeCurve, err
 	}
 
 	badgeStatus := obj.Cover
