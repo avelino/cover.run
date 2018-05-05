@@ -179,6 +179,8 @@ func repoCoverStatus(repo, tag string) (bool, error) {
 	err := redisRing.HGet(inProgrsKey, repoFullName(repo, tag)).Err()
 	if err == nil {
 		return true, nil
+	} else {
+		errLogger.Println(err)
 	}
 	return false, err
 }
@@ -207,28 +209,19 @@ func unsetInProgress(repo, tag string) error {
 func cover(repo, tag string) error {
 	atomic.AddInt32(&coverQCur, 1)
 
-	err := setInProgress(repo, tag)
-	if err != nil {
-		errLogger.Println(err)
-	}
+	setInProgress(repo, tag)
 
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
 	if err != nil {
 		errLogger.Println(err)
-		err := unsetInProgress(repo, tag)
-		if err != nil {
-			errLogger.Println(err)
-		}
+		unsetInProgress(repo, tag)
 		if coverQCur > -1 {
 			atomic.AddInt32(&coverQCur, -1)
 		}
 		return err
 	}
 
-	err = unsetInProgress(repo, tag)
-	if err != nil {
-		errLogger.Println(err)
-	}
+	unsetInProgress(repo, tag)
 
 	obj := &Object{
 		Repo:   repo,
@@ -337,7 +330,6 @@ func subscribe(qname string) {
 		msg, err := pubsub.ReceiveMessage()
 		if err != nil {
 			errLogger.Println(err)
-			return
 		}
 		repo, tag := repoTagFromFullName(msg.Payload)
 		if ok, _ := repoCoverStatus(repo, tag); !ok {
