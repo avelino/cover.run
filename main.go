@@ -348,7 +348,7 @@ func main() {
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 	n.UseHandler(r)
 
-	go subscribe("coverQueue")
+	go subscribe(coverQName)
 
 	n.Run(":3000")
 }
