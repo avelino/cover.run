@@ -194,7 +194,11 @@ func coverageBadge(repo, tag, style string) (string, error) {
 		return errorBadgeCurve, err
 	}
 
-	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
+	badgeStatus := obj.Cover
+	cover, err := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
+	if err != nil {
+		badgeStatus = "error"
+	}
 	var color string
 	if cover >= 70 {
 		color = "green"
@@ -204,5 +208,5 @@ func coverageBadge(repo, tag, style string) (string, error) {
 		color = "red"
 	}
 
-	return getBadge(color, style, obj.Cover), nil
+	return getBadge(color, style, badgeStatus), nil
 }

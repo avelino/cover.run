@@ -213,11 +213,9 @@ func cover(repo, tag string) error {
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
 	if err != nil {
 		errLogger.Println(err)
-		unsetInProgress(repo, tag)
-		if coverQCur > -1 {
-			atomic.AddInt32(&coverQCur, -1)
+		if len(StdErr) == 0 {
+			StdErr = err.Error()
 		}
-		return err
 	}
 
 	unsetInProgress(repo, tag)
@@ -235,20 +233,20 @@ func cover(repo, tag string) error {
 		obj.Output = true
 	}
 
-	err = redisCodec.Set(&cache.Item{
+	rerr := redisCodec.Set(&cache.Item{
 		Key:        repoFullName(repo, tag),
 		Object:     obj,
 		Expiration: time.Hour,
 	})
-	if err != nil {
-		errLogger.Println(err)
+	if rerr != nil {
+		errLogger.Println(rerr)
 	}
 
 	// reduce the simultaneous process number by 1
 	if coverQCur > -1 {
 		atomic.AddInt32(&coverQCur, -1)
 	}
-	return nil
+	return err
 }
 
 // repoCover returns code coverage details for the given repository and Go version
