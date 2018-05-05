@@ -179,9 +179,8 @@ func repoCoverStatus(repo, tag string) (bool, error) {
 	err := redisRing.HGet(inProgrsKey, repoFullName(repo, tag)).Err()
 	if err == nil {
 		return true, nil
-	} else {
-		errLogger.Println(err)
 	}
+	errLogger.Println(err)
 	return false, err
 }
 
