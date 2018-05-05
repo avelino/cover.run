@@ -319,11 +319,11 @@ func repoLatest() ([]*Repository, error) {
 // subscribe subscribes to the Redis channel
 func subscribe(qname string) {
 	pubsub, err := redisClient.Subscribe(qname)
-	defer pubsub.Close()
 	if err != nil {
 		errLogger.Println(err)
 		return
 	}
+	defer pubsub.Close()
 
 	for {
 		msg, err := pubsub.ReceiveMessage()
@@ -347,6 +347,8 @@ func main() {
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 	n.UseHandler(r)
+
 	go subscribe("coverQueue")
+
 	n.Run(":3000")
 }

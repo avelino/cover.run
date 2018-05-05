@@ -14,7 +14,7 @@ import (
 
 const (
 	// Badge templates to generate badges
-	curveBadge = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="118" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="{{.Color}}" d="M61 0h57v20H61z"/><path fill="url(#b)" d="M0 0h118v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="885" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="470">{{.Status}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="470">{{.Status}}</text></g> </svg>`
+	curveBadge = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="{{.Width}}" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="#e05d44" d="M61 0h53v20H61z"/><path fill="url(#b)" d="M0 0h114v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="{{.StatusX}}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="">{{.Status}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text></g> </svg>`
 	flatBadge  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="{{.Color}}" d="M61 0h57v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text></g> </svg>`
 
 	// errorBadge is the SVG badge returned when coverage badge could not be returned
@@ -38,7 +38,8 @@ var (
 func init() {
 	tpl := template.New("")
 	curveBadgeTmpl, _ = tpl.Parse(curveBadge)
-	flatBadgeTmpl, _ = tpl.Parse(flatBadge)
+	tpl2 := template.New("")
+	flatBadgeTmpl, _ = tpl2.Parse(flatBadge)
 }
 
 type badge struct {
@@ -50,7 +51,7 @@ type badge struct {
 }
 
 // getBadge gets the badge from img.shields.io and return as []byte
-func getBadge(color, style, percent string) string {
+func getBadgeImgShield(color, style, percent string) string {
 	cacheKey := fmt.Sprintf("%s-%s-%s", color, style, percent)
 	str := ""
 	err := redisCodec.Get(cacheKey, &str)
@@ -82,8 +83,8 @@ func getBadge(color, style, percent string) string {
 	return string(svg)
 }
 
-// getBadgeNew is a function which will generate SVG rather than fetch from img.shield.io
-func getBadgeNew(color, style, status string) string {
+// getBadge is a function which will generate SVG rather than fetch from img.shield.io
+func getBadge(color, style, status string) string {
 	const label = "cover.run"
 	buf := new(bytes.Buffer)
 	switch strings.ToLower(color) {
@@ -103,7 +104,8 @@ func getBadgeNew(color, style, status string) string {
 		{
 			color = "#a4a61d"
 		}
-	case "lightgrey":
+
+	default:
 		{
 			color = "#9a9a9a"
 		}
@@ -114,8 +116,45 @@ func getBadgeNew(color, style, status string) string {
 		Status: status,
 		Color:  color,
 	}
-	b.StatusX = 725 + (len(b.Status) * 20)
-	b.Width = 61 + (len(b.Status) * 9)
+
+	switch len(b.Status) {
+	case 1:
+		{
+			b.StatusX = 725
+			b.Width = 78
+		}
+	case 2:
+		{
+			b.StatusX = 745
+			b.Width = 90
+		}
+	case 3:
+		{
+			b.StatusX = 775
+			b.Width = 96
+		}
+	case 4:
+		{
+			b.StatusX = 815
+			b.Width = 104
+		}
+	case 5:
+		{
+			b.StatusX = 835
+			b.Width = 108
+		}
+	case 6:
+		{
+			b.StatusX = 865
+			b.Width = 114
+		}
+
+	default:
+		{
+			b.StatusX = 685 + (len(b.Status) * 25)
+			b.Width = 61 + (len(b.Status) * 25)
+		}
+	}
 
 	switch style {
 	case "flat", "curve", "flat-curve":
