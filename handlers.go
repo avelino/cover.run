@@ -15,12 +15,12 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 		tag = DefaultTag
 	}
 	obj, err := repoCover(vars["repo"], tag)
-	if err == nil || err == ErrCovInPrgrs || err == ErrQueueFull {
+	if err == nil || err == ErrCovInPrgrs || err == ErrQueued {
 		json.NewEncoder(w).Encode(obj)
 		return
 	}
 
-	if err != ErrCovInPrgrs && err != ErrQueueFull {
+	if err != ErrCovInPrgrs && err != ErrQueued {
 		errLogger.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -61,7 +61,7 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	obj, err := repoCover(repo, tag)
-	if err == nil || err == ErrCovInPrgrs || err == ErrQueueFull {
+	if err == nil || err == ErrCovInPrgrs || err == ErrQueued {
 		repos, err := repoLatest()
 		if err != nil {
 			errLogger.Println(err)

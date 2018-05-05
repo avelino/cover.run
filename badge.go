@@ -139,8 +139,10 @@ func getBadge(color, style, status string) string {
 
 	default:
 		{
-			b.StatusX = 685 + (len(b.Status) * 25)
-			b.Width = 61 + (len(b.Status) * 25)
+			// 50units for 7 chars
+			statusWidth := (len(b.Status) * 8)
+			b.StatusX = 685 + (statusWidth + 160)
+			b.Width = 61 + statusWidth + 32
 		}
 	}
 
@@ -161,12 +163,12 @@ func getBadge(color, style, status string) string {
 func coverageBadge(repo, tag, style string) (string, error) {
 	obj, err := repoCover(repo, tag)
 	if err != nil {
-		if err == ErrQueueFull {
+		if err == ErrQueued {
 			return getBadge("lightgrey", style, "queued"), nil
 		}
 
 		if err == ErrCovInPrgrs {
-			return getBadge("yellowgreen", style, "progress"), nil
+			return getBadge("yellowgreen", style, "testing"), nil
 		}
 
 		errLogger.Println(err)

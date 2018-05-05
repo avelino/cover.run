@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/cache"
@@ -24,7 +23,7 @@ import (
 
 const (
 	// coverQMax is the maximum number of coverage run to be executed simultaneously
-	coverQMax = 0
+	coverQMax = 5
 	// coverQName is the Redis channel name where the requests are queued
 	coverQName = "coverqueue"
 
@@ -41,9 +40,6 @@ var (
 	// errLogger is the log instance with all the required flags set for error logging
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
 
-	// coverQCur is the current number of cover run requests being executed simultaneously
-	coverQCur = int32(0)
-
 	httpClient = &http.Client{
 		// img.shields.io response time is very slow
 		Timeout: 30 * time.Second,
@@ -56,8 +52,8 @@ var (
 	ErrRepoNotFound = errors.New("Repository not found")
 	// ErrUnknown is the error returned when an unidentified error is encountered
 	ErrUnknown = errors.New("Unknown error occurred")
-	// ErrQueueFull is the error returned when the cover run queueu is full
-	ErrQueueFull = errors.New("Cover run queue is full")
+	// ErrQueued is the error returned when the cover run queueu is full
+	ErrQueued = errors.New("Cover run request queued")
 	// ErrCovInPrgrs is the error returned when the repo coverage test is in progress
 	ErrCovInPrgrs = errors.New("Cover run is in progress")
 
@@ -85,6 +81,7 @@ var (
 	})
 
 	qLock = sync.Mutex{}
+	qChan = make(chan struct{}, coverQMax)
 
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
@@ -181,6 +178,7 @@ func repoCoverStatus(repo, tag string) (bool, error) {
 		return true, nil
 	}
 	errLogger.Println(err)
+
 	return false, err
 }
 
@@ -206,8 +204,6 @@ func unsetInProgress(repo, tag string) error {
 // - Before starting evaluation, it sets the repo's status as in progress
 // - Removes the inprogress status of a repo after it's done
 func cover(repo, tag string) error {
-	atomic.AddInt32(&coverQCur, 1)
-
 	setInProgress(repo, tag)
 
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
@@ -241,11 +237,7 @@ func cover(repo, tag string) error {
 	if rerr != nil {
 		errLogger.Println(rerr)
 	}
-
-	// reduce the simultaneous process number by 1
-	if coverQCur > -1 {
-		atomic.AddInt32(&coverQCur, -1)
-	}
+	<-qChan
 	return err
 }
 
@@ -258,10 +250,12 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		Repo: repo,
 		Tag:  imageTag,
 	}
-
-	if redisCodec.Get(repoFullName(repo, imageTag), &obj) == nil {
+	err := redisCodec.Get(repoFullName(repo, imageTag), &obj)
+	if err == nil {
 		return obj, nil
 	}
+
+	errLogger.Println(err)
 
 	if !imageSupported(imageTag) {
 		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
@@ -272,18 +266,12 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		return obj, ErrCovInPrgrs
 	}
 
-	// Checking if limit of simultaneous processing has reached or not
-	if coverQCur >= coverQMax {
-		err := addToQ(repo, imageTag)
-		if err != nil {
-			errLogger.Println(err)
-		}
-		return obj, ErrQueueFull
+	err = addToQ(repo, imageTag)
+	if err != nil {
+		errLogger.Println(err)
 	}
 
-	go cover(repo, imageTag)
-
-	return obj, ErrCovInPrgrs
+	return obj, ErrQueued
 }
 
 type Repository struct {
@@ -329,24 +317,27 @@ func subscribe(qname string) {
 			errLogger.Println(err)
 		}
 		repo, tag := repoTagFromFullName(msg.Payload)
-		if ok, _ := repoCoverStatus(repo, tag); !ok {
-			cover(repo, tag)
-		}
+
+		errLogger.Println("push to channel")
+		qChan <- struct{}{}
+		errLogger.Println("start cover")
+		go cover(repo, tag)
 	}
 }
 
 func main() {
-	n := negroni.Classic()
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
 	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
 	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
 	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
-		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
-	n.UseHandler(r)
+		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))),
+	)
 
 	go subscribe(coverQName)
 
+	n := negroni.New()
+	n.UseHandler(r)
 	n.Run(":3000")
 }

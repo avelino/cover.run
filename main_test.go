@@ -62,7 +62,7 @@ func TestRun(t *testing.T) {
 
 func TestRepoCover(t *testing.T) {
 	_, err := repoCover("github.com/avelino/cover.run", "golang-1.10")
-	if err != nil && err != ErrCovInPrgrs && err != ErrQueueFull {
+	if err != nil && err != ErrCovInPrgrs && err != ErrQueued {
 		t.Log(err)
 		t.Fail()
 	}
@@ -74,7 +74,7 @@ func TestRepoCover(t *testing.T) {
 	}
 
 	_, err = repoCover("github.com/avelino/nonexistent", "golang-1.10")
-	if err != ErrRepoNotFound && err != ErrCovInPrgrs && err != ErrQueueFull {
+	if err != ErrRepoNotFound && err != ErrCovInPrgrs && err != ErrQueued {
 		t.Log("Expected", ErrRepoNotFound, "got", err)
 		t.Fail()
 	}
