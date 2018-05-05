@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -12,6 +13,7 @@ import (
 )
 
 const (
+	// Badge templates to generate badges
 	curveBadge = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="a"><rect width="118" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#a)"><path fill="#555" d="M0 0h61v20H0z"/><path fill="{{.Color}}" d="M61 0h57v20H61z"/><path fill="url(#b)" d="M0 0h118v20H0z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="885" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="470">{{.Status}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="470">{{.Status}}</text></g> </svg>`
 	flatBadge  = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="{{.Color}}" d="M61 0h57v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text><text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text></g> </svg>`
 
@@ -126,4 +128,42 @@ func getBadgeNew(color, style, status string) string {
 		}
 	}
 	return buf.String()
+}
+
+// coverageBadge returns the SVG badge after computing the coverage
+func coverageBadge(repo, tag, style string) (string, error) {
+	obj, err := repoCover(repo, tag)
+	if err != nil {
+		if err == ErrQueueFull {
+			if style == "flat-square" {
+				return queuedBadgeFlat, nil
+			}
+			return queuedBadgeCurve, nil
+		}
+
+		if err == ErrCovInPrgrs {
+			if style == "flat-square" {
+				return progressBadgeFlat, nil
+			}
+			return progressBadgeCurve, nil
+		}
+
+		errLogger.Println(err)
+		if style == "flat-square" {
+			return errorBadgeFlat, err
+		}
+		return errorBadgeCurve, err
+	}
+
+	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
+	var color string
+	if cover >= 70 {
+		color = "green"
+	} else if cover >= 45 {
+		color = "yellow"
+	} else {
+		color = "red"
+	}
+
+	return getBadge(color, style, obj.Cover), nil
 }

@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,8 +25,11 @@ import (
 const (
 	// coverQMax is the maximum number of coverage run to be executed simultaneously
 	coverQMax = 0
+	// coverQName is the Redis channel name where the requests are queued
+	coverQName = "coverqueue"
 
-	// inProgrsKey is the redis HSet key in which all repo + tags are saved
+	// inProgrsKey is the redis HSet key in which all repo + tags which are currently being run
+	// are saved
 	inProgrsKey = "cover-in-progress"
 
 	// DefaultTag is the Go version to run the tests with when no version
@@ -81,8 +83,8 @@ var (
 		WriteTimeout: time.Second * 5,
 		PoolTimeout:  time.Second * 120,
 	})
+
 	qLock = sync.Mutex{}
-	qChan = make(chan struct{}, coverQMax)
 
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
@@ -91,8 +93,7 @@ var (
 // imageSupported returns true if the given Go version is supported
 func imageSupported(tag string) bool {
 	switch tag {
-	case
-		"golang-1.10",
+	case "golang-1.10",
 		"golang-1.9",
 		"golang-1.8":
 		return true
@@ -100,12 +101,13 @@ func imageSupported(tag string) bool {
 	return false
 }
 
-// repoExists checks if the given repository exists (worksing only if HTTP request returns 200)
+// repoExists checks if the given repository exists (works only if HTTP request returns 200)
 func repoExists(repo string) (bool, error) {
 	resp, err := httpClient.Get(fmt.Sprintf("https://%s", repo))
 	if err != nil {
 		return false, err
 	}
+
 	if resp.StatusCode == http.StatusNotFound {
 		return false, ErrRepoNotFound
 	}
@@ -113,7 +115,7 @@ func repoExists(repo string) (bool, error) {
 	if resp.StatusCode > 399 {
 		return false, ErrUnknown
 	}
-	return false, nil
+	return true, nil
 }
 
 // run runs the custom script to get the coverage details; using gofn
@@ -149,14 +151,13 @@ type Object struct {
 	Output bool
 }
 
-// getQMsg gets the message to be send to the Redis channel
-func getQMsg(repo, tag string) string {
+// repoFullName generates a name by combining the Go tag
+func repoFullName(repo, tag string) string {
 	return fmt.Sprintf("%s:%s", repo, tag)
 }
 
-// getRepoTagFromMsg returns the repo name and Go tag from the message received from
-// Redis channel
-func getRepoTagFromMsg(msg string) (string, string) {
+// repoTagFromFullName returns the repo name and Go tag, given the generated full name
+func repoTagFromFullName(msg string) (string, string) {
 	parts := strings.Split(msg, ":")
 	if len(parts) == 2 {
 		return parts[0], parts[1]
@@ -167,59 +168,42 @@ func getRepoTagFromMsg(msg string) (string, string) {
 // addToQ pushes a new cover run request to the Redis channel
 func addToQ(repo, tag string) error {
 	qLock.Lock()
-	err := redisClient.Publish("coverQueue", getQMsg(repo, tag)).Err()
+	err := redisClient.Publish(coverQName, repoFullName(repo, tag)).Err()
 	qLock.Unlock()
 	return err
 }
 
-// checkInProgress returns true if a repository + tag cover run is in progress
-func checkInProgress(repo, tag string) (bool, error) {
+// repoCoverStatus returns true if a repository + tag cover run is in progress
+func repoCoverStatus(repo, tag string) (bool, error) {
 	// Check if cover run is already in progress for the given repo and tag
-	err := redisRing.HGet(inProgrsKey, getQMsg(repo, tag)).Err()
+	err := redisRing.HGet(inProgrsKey, repoFullName(repo, tag)).Err()
 	if err == nil {
 		return true, nil
 	}
 	return false, err
 }
 
-// setInProgress sets the repo + tag as in progress
+// setInProgress sets the repo + tag as in progress by adding to inPrgorsKey
 func setInProgress(repo, tag string) error {
-	// Set the repo + tag as in progress to prevent the same repo+tag clogging the Q
-	err := redisRing.HSet(inProgrsKey, getQMsg(repo, tag), "y").Err()
+	err := redisRing.HSet(inProgrsKey, repoFullName(repo, tag), "y").Err()
 	if err != nil {
 		errLogger.Println(err)
 	}
 	return err
 }
 
-// qSubscribe subscribes to the Redis channel
-func qSubscribe(qname string) {
-	pubsub, err := redisClient.Subscribe(qname)
-	defer pubsub.Close()
+// unsetInProgress unsets the repo + tag from inprogress status
+func unsetInProgress(repo, tag string) error {
+	err := redisRing.HDel(inProgrsKey, repoFullName(repo, tag)).Err()
 	if err != nil {
 		errLogger.Println(err)
-		return
 	}
-
-	err = redisClient.Publish("mychannel1", "hello").Err()
-	if err != nil {
-		errLogger.Println(err)
-		return
-	}
-
-	for {
-		msg, err := pubsub.ReceiveMessage()
-		if err != nil {
-			errLogger.Println(err)
-			return
-		}
-		repo, tag := getRepoTagFromMsg(msg.Payload)
-		if ok, _ := checkInProgress(repo, tag); !ok {
-			cover(repo, tag)
-		}
-	}
+	return err
 }
 
+// cover evaluates the coverage of a repository
+// - Before starting evaluation, it sets the repo's status as in progress
+// - Removes the inprogress status of a repo after it's done
 func cover(repo, tag string) error {
 	atomic.AddInt32(&coverQCur, 1)
 
@@ -231,16 +215,24 @@ func cover(repo, tag string) error {
 	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
 	if err != nil {
 		errLogger.Println(err)
+		err := unsetInProgress(repo, tag)
+		if err != nil {
+			errLogger.Println(err)
+		}
+		if coverQCur > -1 {
+			atomic.AddInt32(&coverQCur, -1)
+		}
 		return err
 	}
 
-	cacheKey := getQMsg(repo, tag)
-
-	if err := redisRing.HDel(inProgrsKey, cacheKey).Err(); err != nil {
+	err = unsetInProgress(repo, tag)
+	if err != nil {
 		errLogger.Println(err)
 	}
 
 	obj := &Object{
+		Repo:   repo,
+		Tag:    tag,
 		Cover:  StdErr,
 		Output: false,
 	}
@@ -252,13 +244,15 @@ func cover(repo, tag string) error {
 	}
 
 	err = redisCodec.Set(&cache.Item{
-		Key:        cacheKey,
+		Key:        repoFullName(repo, tag),
 		Object:     obj,
 		Expiration: time.Hour,
 	})
 	if err != nil {
 		errLogger.Println(err)
 	}
+
+	// reduce the simultaneous process number by 1
 	if coverQCur > -1 {
 		atomic.AddInt32(&coverQCur, -1)
 	}
@@ -266,13 +260,16 @@ func cover(repo, tag string) error {
 }
 
 // repoCover returns code coverage details for the given repository and Go version
+// - It checks if the coverage details is available in cache or not
+// - It checks if the cover run is in progress or not
+// - It checks if cover can be run simultaneously, if not request is pushed to Q
 func repoCover(repo, imageTag string) (*Object, error) {
 	obj := &Object{
 		Repo: repo,
 		Tag:  imageTag,
 	}
 
-	if redisCodec.Get(getQMsg(repo, imageTag), &obj) == nil {
+	if redisCodec.Get(repoFullName(repo, imageTag), &obj) == nil {
 		return obj, nil
 	}
 
@@ -281,10 +278,11 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		return obj, ErrImgUnSupported
 	}
 
-	if ok, _ := checkInProgress(repo, imageTag); ok {
+	if ok, _ := repoCoverStatus(repo, imageTag); ok {
 		return obj, ErrCovInPrgrs
 	}
 
+	// Checking if limit of simultaneous processing has reached or not
 	if coverQCur >= coverQMax {
 		err := addToQ(repo, imageTag)
 		if err != nil {
@@ -326,42 +324,26 @@ func repoLatest() ([]*Repository, error) {
 	return repos, nil
 }
 
-// coverageBadge returns the SVG badge after computing the coverage
-func coverageBadge(repo, tag, style string) (string, error) {
-	obj, err := repoCover(repo, tag)
+// subscribe subscribes to the Redis channel
+func subscribe(qname string) {
+	pubsub, err := redisClient.Subscribe(qname)
+	defer pubsub.Close()
 	if err != nil {
-		if err == ErrQueueFull {
-			if style == "flat-square" {
-				return queuedBadgeFlat, nil
-			}
-			return queuedBadgeCurve, nil
-		}
-
-		if err == ErrCovInPrgrs {
-			if style == "flat-square" {
-				return progressBadgeFlat, nil
-			}
-			return progressBadgeCurve, nil
-		}
-
 		errLogger.Println(err)
-		if style == "flat-square" {
-			return errorBadgeFlat, err
+		return
+	}
+
+	for {
+		msg, err := pubsub.ReceiveMessage()
+		if err != nil {
+			errLogger.Println(err)
+			return
 		}
-		return errorBadgeCurve, err
+		repo, tag := repoTagFromFullName(msg.Payload)
+		if ok, _ := repoCoverStatus(repo, tag); !ok {
+			cover(repo, tag)
+		}
 	}
-
-	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
-	var color string
-	if cover >= 70 {
-		color = "green"
-	} else if cover >= 45 {
-		color = "yellow"
-	} else {
-		color = "red"
-	}
-
-	return getBadge(color, style, obj.Cover), nil
 }
 
 func main() {
@@ -374,6 +356,6 @@ func main() {
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 	n.UseHandler(r)
-	go qSubscribe("coverQueue")
+	go subscribe("coverQueue")
 	n.Run(":3000")
 }
