@@ -80,18 +80,21 @@ func TestRepoCover(t *testing.T) {
 	}
 }
 func TestCover(t *testing.T) {
+	qChan <- struct{}{}
 	err := cover("github.com/avelino/cover.run", "golang-1.10")
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 	}
 
+	qChan <- struct{}{}
 	err = cover("github.com/avelino/cover.run", "golang-1.0.1")
 	if err == nil {
 		t.Log("Expected error ", "got", err)
 		t.Fail()
 	}
 
+	qChan <- struct{}{}
 	err = cover("github.com/avelino/nonexistent", "golang-1.10")
 	if err != ErrRepoNotFound {
 		t.Log("Expected", ErrRepoNotFound, "got", err)

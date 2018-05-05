@@ -40,6 +40,12 @@ var (
 	// errLogger is the log instance with all the required flags set for error logging
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
 
+	// qLock is used to push to Redis channel because redis pub-sub in go-redis is
+	// not concurrency safe
+	qLock = sync.Mutex{}
+	// qChan is used to control the number of simultaneos executions
+	qChan = make(chan struct{}, coverQMax)
+
 	httpClient = &http.Client{
 		// img.shields.io response time is very slow
 		Timeout: 30 * time.Second,
@@ -79,9 +85,6 @@ var (
 		WriteTimeout: time.Second * 5,
 		PoolTimeout:  time.Second * 120,
 	})
-
-	qLock = sync.Mutex{}
-	qChan = make(chan struct{}, coverQMax)
 
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
