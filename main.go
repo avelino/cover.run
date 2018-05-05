@@ -320,10 +320,7 @@ func subscribe(qname string) {
 			errLogger.Println(err)
 		}
 		repo, tag := repoTagFromFullName(msg.Payload)
-
-		errLogger.Println("push to channel")
 		qChan <- struct{}{}
-		errLogger.Println("start cover")
 		go cover(repo, tag)
 	}
 }
@@ -340,7 +337,7 @@ func main() {
 
 	go subscribe(coverQName)
 
-	n := negroni.New()
+	n := negroni.Classic()
 	n.UseHandler(r)
 	n.Run(":3000")
 }
