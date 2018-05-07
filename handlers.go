@@ -28,7 +28,6 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 
 // HandlerRepoSVG returns the SVG badge with coverage for a given repository
 func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
 	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
 	w.Header().Set("pragma", "no-cache")
 	w.Header().Set("expires", "-1")
