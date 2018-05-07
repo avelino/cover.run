@@ -136,6 +136,11 @@ func getBadge(color, style, status string) string {
 			b.StatusX = 865
 			b.Width = 114
 		}
+	case 7, 8, 9:
+		{
+			b.StatusX = 895
+			b.Width = 120
+		}
 
 	default:
 		{
