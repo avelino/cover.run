@@ -10,7 +10,7 @@ import (
 type scripter interface {
 	Eval(script string, keys []string, args ...interface{}) *Cmd
 	EvalSha(sha1 string, keys []string, args ...interface{}) *Cmd
-	ScriptExists(scripts ...string) *BoolSliceCmd
+	ScriptExists(hashes ...string) *BoolSliceCmd
 	ScriptLoad(script string) *StringCmd
 }
 
@@ -31,12 +31,16 @@ func NewScript(src string) *Script {
 	}
 }
 
+func (s *Script) Hash() string {
+	return s.hash
+}
+
 func (s *Script) Load(c scripter) *StringCmd {
 	return c.ScriptLoad(s.src)
 }
 
 func (s *Script) Exists(c scripter) *BoolSliceCmd {
-	return c.ScriptExists(s.src)
+	return c.ScriptExists(s.hash)
 }
 
 func (s *Script) Eval(c scripter, keys []string, args ...interface{}) *Cmd {
@@ -47,6 +51,8 @@ func (s *Script) EvalSha(c scripter, keys []string, args ...interface{}) *Cmd {
 	return c.EvalSha(s.hash, keys, args...)
 }
 
+// Run optimistically uses EVALSHA to run the script. If script does not exist
+// it is retried using EVAL.
 func (s *Script) Run(c scripter, keys []string, args ...interface{}) *Cmd {
 	r := s.EvalSha(c, keys, args...)
 	if err := r.Err(); err != nil && strings.HasPrefix(err.Error(), "NOSCRIPT ") {

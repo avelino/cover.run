@@ -1,19 +1,18 @@
 package redis
 
 import (
-	"github.com/go-redis/redis/internal"
 	"github.com/go-redis/redis/internal/pool"
+	"github.com/go-redis/redis/internal/proto"
 )
 
-// Redis transaction failed.
-const TxFailedErr = internal.RedisError("redis: transaction failed")
+// TxFailedErr transaction redis failed.
+const TxFailedErr = proto.RedisError("redis: transaction failed")
 
 // Tx implements Redis transactions as described in
 // http://redis.io/topics/transactions. It's NOT safe for concurrent use
 // by multiple goroutines, because Exec resets list of watched keys.
 // If you don't need WATCH it is better to use Pipeline.
 type Tx struct {
-	cmdable
 	statefulCmdable
 	baseClient
 }
@@ -25,8 +24,8 @@ func (c *Client) newTx() *Tx {
 			connPool: pool.NewStickyConnPool(c.connPool.(*pool.ConnPool), true),
 		},
 	}
-	tx.cmdable.process = tx.Process
-	tx.statefulCmdable.process = tx.Process
+	tx.baseClient.init()
+	tx.statefulCmdable.setProcessor(tx.Process)
 	return &tx
 }
 
@@ -38,14 +37,13 @@ func (c *Client) Watch(fn func(*Tx) error, keys ...string) error {
 			return err
 		}
 	}
-	firstErr := fn(tx)
-	if err := tx.Close(); err != nil && firstErr == nil {
-		firstErr = err
-	}
-	return firstErr
+
+	err := fn(tx)
+	_ = tx.Close()
+	return err
 }
 
-// close closes the transaction, releasing any open resources.
+// Close closes the transaction, releasing any open resources.
 func (c *Tx) Close() error {
 	_ = c.Unwatch().Err()
 	return c.baseClient.Close()
@@ -55,7 +53,7 @@ func (c *Tx) Close() error {
 // of a transaction.
 func (c *Tx) Watch(keys ...string) *StatusCmd {
 	args := make([]interface{}, 1+len(keys))
-	args[0] = "WATCH"
+	args[0] = "watch"
 	for i, key := range keys {
 		args[1+i] = key
 	}
@@ -67,7 +65,7 @@ func (c *Tx) Watch(keys ...string) *StatusCmd {
 // Unwatch flushes all the previously watched keys for a transaction.
 func (c *Tx) Unwatch(keys ...string) *StatusCmd {
 	args := make([]interface{}, 1+len(keys))
-	args[0] = "UNWATCH"
+	args[0] = "unwatch"
 	for i, key := range keys {
 		args[1+i] = key
 	}
@@ -76,12 +74,11 @@ func (c *Tx) Unwatch(keys ...string) *StatusCmd {
 	return cmd
 }
 
-func (c *Tx) Pipeline() *Pipeline {
+func (c *Tx) Pipeline() Pipeliner {
 	pipe := Pipeline{
-		exec: c.pipelineExecer(c.txPipelineProcessCmds),
+		exec: c.processTxPipeline,
 	}
-	pipe.cmdable.process = pipe.Process
-	pipe.statefulCmdable.process = pipe.Process
+	pipe.statefulCmdable.setProcessor(pipe.Process)
 	return &pipe
 }
 
@@ -94,6 +91,14 @@ func (c *Tx) Pipeline() *Pipeline {
 // Exec always returns list of commands. If transaction fails
 // TxFailedErr is returned. Otherwise Exec returns error of the first
 // failed command or nil.
-func (c *Tx) Pipelined(fn func(*Pipeline) error) ([]Cmder, error) {
-	return c.Pipeline().pipelined(fn)
+func (c *Tx) Pipelined(fn func(Pipeliner) error) ([]Cmder, error) {
+	return c.Pipeline().Pipelined(fn)
+}
+
+func (c *Tx) TxPipelined(fn func(Pipeliner) error) ([]Cmder, error) {
+	return c.Pipelined(fn)
+}
+
+func (c *Tx) TxPipeline() Pipeliner {
+	return c.Pipeline()
 }

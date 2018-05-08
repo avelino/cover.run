@@ -1,0 +1,33 @@
+sudo: required
+
+language: go
+
+services:
+  - docker
+
+os:
+  - linux
+
+go:
+  - 1.9
+  - "1.10"
+  - tip
+
+matrix:
+  allow_failures:
+  - go: tip
+
+before_install:
+  - go get -t ./...
+  - eval "$(ssh-agent -s)"
+
+script:
+  - make coverage
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/6ded9a49eadd62bc59da
