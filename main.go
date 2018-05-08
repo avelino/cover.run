@@ -2,17 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-redis/cache"
@@ -24,13 +21,36 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
+const (
+	// coverQMax is the maximum number of coverage run to be executed simultaneously
+	coverQMax = 5
+	// coverQName is the Redis channel name where the requests are queued
+	coverQName = "coverqueue"
+
+	// inProgrsKey is the redis HSet key in which all repo + tags which are currently being run
+	// are saved
+	inProgrsKey = "cover-in-progress"
+
+	// DefaultTag is the Go version to run the tests with when no version
+	// is specified
+	DefaultTag = "golang-1.10"
+)
+
 var (
+	// errLogger is the log instance with all the required flags set for error logging
 	errLogger = log.New(os.Stderr, "Cover.Run ", log.LstdFlags|log.Lshortfile)
+
+	// qLock is used to push to Redis channel because redis pub-sub in go-redis is
+	// not concurrency safe
+	qLock = sync.Mutex{}
+	// qChan is used to control the number of simultaneos executions
+	qChan = make(chan struct{}, coverQMax)
 
 	httpClient = &http.Client{
 		// img.shields.io response time is very slow
 		Timeout: 30 * time.Second,
 	}
+
 	// ErrImgUnSupported is the error returned when the Go version requested is
 	// not in the supported list
 	ErrImgUnSupported = errors.New("Unsupported Go version provided")
@@ -38,6 +58,10 @@ var (
 	ErrRepoNotFound = errors.New("Repository not found")
 	// ErrUnknown is the error returned when an unidentified error is encountered
 	ErrUnknown = errors.New("Unknown error occurred")
+	// ErrQueued is the error returned when the cover run queueu is full
+	ErrQueued = errors.New("Cover run request queued")
+	// ErrCovInPrgrs is the error returned when the repo coverage test is in progress
+	ErrCovInPrgrs = errors.New("Cover run is in progress")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -54,21 +78,22 @@ var (
 			return msgpack.Unmarshal(b, v)
 		},
 	}
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:         "redis:6379",
+		ReadTimeout:  time.Second * 2,
+		DialTimeout:  time.Second * 5,
+		WriteTimeout: time.Second * 5,
+		PoolTimeout:  time.Second * 120,
+	})
 
 	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
 )
 
-const (
-	// DefaultTag is the Go version to run the tests with when no version
-	// is specified
-	DefaultTag = "golang-1.10"
-)
-
+// imageSupported returns true if the given Go version is supported
 func imageSupported(tag string) bool {
 	switch tag {
-	case
-		"golang-1.10",
+	case "golang-1.10",
 		"golang-1.9",
 		"golang-1.8":
 		return true
@@ -76,17 +101,28 @@ func imageSupported(tag string) bool {
 	return false
 }
 
-func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+// repoExists checks if the given repository exists (works only if HTTP request returns 200)
+func repoExists(repo string) (bool, error) {
 	resp, err := httpClient.Get(fmt.Sprintf("https://%s", repo))
 	if err != nil {
-		return "", "", err
+		return false, err
 	}
+
 	if resp.StatusCode == http.StatusNotFound {
-		return "", "", ErrRepoNotFound
+		return false, ErrRepoNotFound
 	}
 
 	if resp.StatusCode > 399 {
-		return "", "", ErrUnknown
+		return false, ErrUnknown
+	}
+	return true, nil
+}
+
+// run runs the custom script to get the coverage details; using gofn
+func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+	_, err := repoExists(repo)
+	if err != nil {
+		return "", "", err
 	}
 
 	buildOpts := &provision.BuildOptions{
@@ -107,19 +143,6 @@ func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 	return StdOut, StdErr, err
 }
 
-// getBadge gets the badge from img.shields.io and return as []byte
-func getBadge(color, style, percent string) ([]byte, error) {
-	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
-
-	resp, err := httpClient.Get(imgURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
-}
-
 // Object struct holds all the details of a repository
 type Object struct {
 	Repo   string
@@ -128,38 +151,130 @@ type Object struct {
 	Output bool
 }
 
+// repoFullName generates a name by combining the Go tag
+func repoFullName(repo, tag string) string {
+	return fmt.Sprintf("%s:%s", repo, tag)
+}
+
+// repoTagFromFullName returns the repo name and Go tag, given the generated full name
+func repoTagFromFullName(msg string) (string, string) {
+	parts := strings.Split(msg, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "", ""
+}
+
+// addToQ pushes a new cover run request to the Redis channel
+func addToQ(repo, tag string) error {
+	qLock.Lock()
+	err := redisClient.Publish(coverQName, repoFullName(repo, tag)).Err()
+	qLock.Unlock()
+	return err
+}
+
+// repoCoverStatus returns true if a repository + tag cover run is in progress
+func repoCoverStatus(repo, tag string) (bool, error) {
+	// Check if cover run is already in progress for the given repo and tag
+	err := redisRing.HGet(inProgrsKey, repoFullName(repo, tag)).Err()
+	if err == nil {
+		return true, nil
+	}
+	errLogger.Println(err)
+
+	return false, err
+}
+
+// setInProgress sets the repo + tag as in progress by adding to inPrgorsKey
+func setInProgress(repo, tag string) error {
+	err := redisRing.HSet(inProgrsKey, repoFullName(repo, tag), "y").Err()
+	if err != nil {
+		errLogger.Println(err)
+	}
+	return err
+}
+
+// unsetInProgress unsets the repo + tag from inprogress status
+func unsetInProgress(repo, tag string) error {
+	err := redisRing.HDel(inProgrsKey, repoFullName(repo, tag)).Err()
+	if err != nil {
+		errLogger.Println(err)
+	}
+	return err
+}
+
+// cover evaluates the coverage of a repository
+// - Before starting evaluation, it sets the repo's status as in progress
+// - Removes the inprogress status of a repo after it's done
+func cover(repo, tag string) error {
+	setInProgress(repo, tag)
+
+	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
+	if err != nil {
+		errLogger.Println(err)
+		if len(StdErr) == 0 {
+			StdErr = err.Error()
+		}
+	}
+
+	unsetInProgress(repo, tag)
+
+	obj := &Object{
+		Repo:   repo,
+		Tag:    tag,
+		Cover:  StdErr,
+		Output: false,
+	}
+
+	stdOut := strings.Trim(StdOut, " \n")
+	if stdOut != "" {
+		obj.Cover = stdOut
+		obj.Output = true
+	}
+
+	rerr := redisCodec.Set(&cache.Item{
+		Key:        repoFullName(repo, tag),
+		Object:     obj,
+		Expiration: time.Hour,
+	})
+	if rerr != nil {
+		errLogger.Println(rerr)
+	}
+	<-qChan
+	return err
+}
+
 // repoCover returns code coverage details for the given repository and Go version
+// - It checks if the coverage details is available in cache or not
+// - It checks if the cover run is in progress or not
+// - It checks if cover can be run simultaneously, if not request is pushed to Q
 func repoCover(repo, imageTag string) (*Object, error) {
-	obj := &Object{}
-	cacheKey := fmt.Sprintf("%s-%s", repo, imageTag)
-	obj.Repo = repo
-	obj.Tag = imageTag
+	obj := &Object{
+		Repo: repo,
+		Tag:  imageTag,
+	}
+	err := redisCodec.Get(repoFullName(repo, imageTag), &obj)
+	if err == nil {
+		return obj, nil
+	}
+
+	errLogger.Println(err)
+
 	if !imageSupported(imageTag) {
 		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
 		return obj, ErrImgUnSupported
 	}
 
-	if err := redisCodec.Get(cacheKey, &obj); err != nil {
-		StdOut, StdErr, err := run("avelino/cover.run", imageTag, repo)
-		stdOut := strings.Trim(StdOut, " \n")
-		obj.Cover = StdErr
-		obj.Output = false
-		if stdOut != "" {
-			obj.Cover = stdOut
-			obj.Output = true
-		}
-		rerr := redisCodec.Set(&cache.Item{
-			Key:        cacheKey,
-			Object:     obj,
-			Expiration: time.Hour,
-		})
-		if rerr != nil {
-			errLogger.Println(rerr)
-		}
-
-		return obj, err
+	if ok, _ := repoCoverStatus(repo, imageTag); ok {
+		return obj, ErrCovInPrgrs
 	}
-	return obj, nil
+
+	err = addToQ(repo, imageTag)
+	if err != nil {
+		errLogger.Println(err)
+	}
+
+	return obj, ErrQueued
 }
 
 type Repository struct {
@@ -190,134 +305,39 @@ func repoLatest() ([]*Repository, error) {
 	return repos, nil
 }
 
-// HandlerRepoJSON returns the coverage details of a repository as JSON
-func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
-	}
-	obj, err := repoCover(vars["repo"], tag)
+// subscribe subscribes to the Redis channel
+func subscribe(qname string) {
+	pubsub, err := redisClient.Subscribe(qname)
 	if err != nil {
 		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(obj)
-}
+	defer pubsub.Close()
 
-func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-CoverRunProxy", "CoverRunProxy")
-	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
-	w.Header().Set("pragma", "no-cache")
-	w.Header().Set("expires", "-1")
-
-	vars := mux.Vars(r)
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
-	}
-
-	badgeStyle := r.URL.Query().Get("style")
-	if badgeStyle != "flat" {
-		badgeStyle = "flat-square"
-	}
-
-	obj, err := repoCover(vars["repo"], tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	cover, _ := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
-	var color string
-	if cover >= 70 {
-		color = "green"
-	} else if cover >= 45 {
-		color = "yellow"
-	} else {
-		color = "red"
-	}
-
-	badgeName := fmt.Sprintf("%s%s%s", color, badgeStyle, obj.Cover)
-	svg, err := redisRing.Get(badgeName).Bytes()
-	if err != nil {
-		if err != redis.Nil {
-			errLogger.Println(err)
-		}
-
-		svg, err = getBadge(color, badgeStyle, obj.Cover)
+	for {
+		msg, err := pubsub.ReceiveMessage()
 		if err != nil {
 			errLogger.Println(err)
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
 		}
-
-		go func() {
-			err := redisRing.Set(badgeName, svg, 0).Err()
-			if err != nil {
-				errLogger.Println(err)
-			}
-		}()
-	}
-
-	w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
-	w.Header().Set("Content-Encoding", "br")
-	w.Write(svg)
-}
-
-func HandlerRepo(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	repo := vars["repo"]
-	tag := r.URL.Query().Get("tag")
-	if tag == "" {
-		tag = DefaultTag
-	}
-
-	obj, err := repoCover(repo, tag)
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	repos, err := repoLatest()
-	if err != nil {
-		errLogger.Println(err)
-	}
-
-	repoTmpl.Execute(w, map[string]interface{}{
-		"Repo":         repo,
-		"Cover":        obj.Cover,
-		"Tag":          obj.Tag,
-		"repositories": repos,
-	})
-}
-
-func Handler(w http.ResponseWriter, r *http.Request) {
-	repos, err := repoLatest()
-	if err != nil {
-		errLogger.Println(err)
-	}
-
-	err = homeTmpl.Execute(w, map[string]interface{}{
-		"repositories": repos,
-	})
-	if err != nil {
-		errLogger.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		repo, tag := repoTagFromFullName(msg.Payload)
+		qChan <- struct{}{}
+		go cover(repo, tag)
 	}
 }
 
 func main() {
-	n := negroni.Classic()
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
 	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
 	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
 	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
-		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
+		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))),
+	)
+
+	go subscribe(coverQName)
+
+	n := negroni.Classic()
 	n.UseHandler(r)
 	n.Run(":3000")
 }
