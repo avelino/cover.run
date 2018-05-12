@@ -31,8 +31,8 @@
 				{{template "breadcrumb" .}}
 			</ul>
 		</header>
-		<main class="container">{{template "content" .}}</main>
-		<footer class="fixed-bottom page-footer text-center text-md-left font-small blue pt-4 mt-4">
+		<main class="container" style="min-height: 80vh">{{template "content" .}}</main>
+		<footer class="page-footer text-center text-md-left font-small blue pt-4 mt-4">
 			{{if .repositories}}
 			<div class="container-fluid text-center text-md-left">
 				<div class="row">
