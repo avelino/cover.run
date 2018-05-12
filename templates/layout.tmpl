@@ -8,7 +8,7 @@
 		<meta name="description" content="Cover as a service" />
 		<meta name="author" content="Avelino">
 
-		<title>{{if .Repo}}{{.Repo}} - {{end}}cover.run</title>
+		<title>{{if .Repo}}{{.Repo}} - {{end}}Cover.Run</title>
 
 		<link href="/assets/css/bootstrap.min.css" rel="stylesheet" />
 		<link href="/assets/css/mdb.min.css" rel="stylesheet" />
@@ -21,7 +21,7 @@
 	<body>
 		<header>
 			<nav class="navbar navbar-expand-lg navbar-dark indigo">
-				<a class="navbar-brand" href="/">Cover.run</a>
+				<a class="navbar-brand" href="/">Cover.Run</a>
 			</nav>
 			<ul class="breadcrumb">
 				<li>
@@ -31,7 +31,7 @@
 				{{template "breadcrumb" .}}
 			</ul>
 		</header>
-		<main class="container" style="min-height: 80vh">{{template "content" .}}</main>
+		<main class="container" style="min-height: 65vh">{{template "content" .}}</main>
 		<footer class="page-footer text-center text-md-left font-small blue pt-4 mt-4">
 			{{if .repositories}}
 			<div class="container-fluid text-center text-md-left">
@@ -54,8 +54,9 @@
 			{{end}}
 			<div class="footer-copyright py-3 text-center">
 				&copy; 2018
-				<a href="https://gocover.run">Cover.run</a>
+				<a href="/">Cover.run</a>
 			</div>
+			{{template "footer" .}}
 		</footer>
 	</body>
 
