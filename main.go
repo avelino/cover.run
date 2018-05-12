@@ -307,11 +307,7 @@ func repoLatest() ([]*Repository, error) {
 
 // subscribe subscribes to the Redis channel
 func subscribe(qname string) {
-	pubsub, err := redisClient.Subscribe(qname)
-	if err != nil {
-		errLogger.Println(err)
-		return
-	}
+	pubsub := redisClient.Subscribe(qname)
 	defer pubsub.Close()
 
 	for {

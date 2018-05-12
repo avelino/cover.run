@@ -1,1 +1,6 @@
-# Empty CSS file for your own CSS
+.page-footer {
+	position: fixed;
+	left: 0;
+	bottom: 0;
+	right: 0;
+}

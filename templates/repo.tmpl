@@ -1,28 +1,50 @@
 {{define "head"}}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.6.1/clipboard.min.js"></script>
-{{end}}
-
-{{define "footer"}}
-<script>var clipboard = new Clipboard('.btn');</script>
-{{end}}
-
-{{define "breadcrumb"}}
-<li><a href="/">go</a> <span class="divider">/</span></li>
-<li class="active">{{.Repo}}</li>
-{{end}}
-
-{{define "content"}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>{{end}} {{define "footer"}}{{end}} {{define "breadcrumb"}}
+<li>
+  go
+  <span class="divider">/</span>
+</li>
+<li class="active">
+  <a href="https://{{.Repo}}" target="_blank">{{.Repo}}</a>
+</li>
+{{end}} {{define "content"}}
 <div class="row">
   <div class="col-md-12">
-  <a href="/go/{{.Repo}}?tag={{.Tag}}"><img src="/go/{{.Repo}}.svg?tag={{.Tag}}" alt="{{.Cover}}" /></a>
-  <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank"><img src="https://goreportcard.com/badge/{{.Repo}}"></a>
-  <a href="https://godoc.org/{{.Repo}}" target="_blank"><img src="https://godoc.org/{{.Repo}}?status.svg"></a>
+    <div class="jumbotron">
+      <h4>Status</h4>
+      <p>
+        <a href="/go/{{.Repo}}?tag={{.Tag}}">
+          <img src="/go/{{.Repo}}.svg?tag={{.Tag}}&style=flat" alt="{{.Cover}}" />
+        </a>
+        <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank">
+          <img src="https://goreportcard.com/badge/{{.Repo}}">
+        </a>
+        <a href="https://godoc.org/{{.Repo}}" target="_blank">
+          <img src="https://godoc.org/{{.Repo}}?status.svg">
+        </a>
+      </p>
+
+      <hr class="my-4" />
+
+      <h4>Markdown</h4>
+      <code id="badgemd">![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})</code>
+      <p style="display: none" id="copybadgecontainer">
+        <button class="btn btn-primary btn-sm" id="copybadge" data-clipboard-target="#badgemd">Copy</button>
+      </p>
+      {{if .Cover}}
+      <hr class="my-4" />
+      <h4>Details</h4>
+      <samp>{{.Cover | html}}</samp>
+      {{end}}
+    </div>
   </div>
 </div>
-Markdown: <input id="markdown" type="text" value="![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})">
-<button class="btn" data-clipboard-action="copy" data-clipboard-target="#markdown">Copy</button>
-
-<div class="jumbotron well">
-  <h2>{{.Cover | html}}</h2>
-</div>
-{{end}}
+<script type="text/javascript">
+  if (window.ClipboardJS) {
+    $('#copybadgecontainer').attr('style', '');
+    const clipboard = new ClipboardJS('#copybadge');
+    clipboard.on('success', function (e) {
+      e.clearSelection();
+    });
+  }
+</script> {{end}}

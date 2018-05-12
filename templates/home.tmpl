@@ -1,63 +1,17 @@
-{{define "breadcrumb"}}
-{{end}}
-{{define "head"}}
-{{end}}
-{{define "footer"}}
-{{end}}
-
-{{define "content"}}
-<script>
- function actionForm(repo) {
-   url = "/go/" + repo + "?tag=" + $("#image_tag").val()
-   $("form").attr("action", url);
-   return url
-};
- $(document).ready(function () {
-   $("#repo").keypress(function(){
-     actionForm($("#repo").val());
-   });
-   $("button").click(function() {
-     actionForm($("#repo").val());
-   });
-   $("form").submit(function(){
-     actionForm($("#repo").val());
-   });
-});
-</script>
-<form class="form-horizontal" method="POST" role="form">
-  <div class="jumbotron">
-    <p>See code coverage.</p>
-
-    <div class="row">
-      <div class="col-xs-12 col-sm-10">
-	<input type="text" class="form-control" placeholder="repository address, e.g. github.com/user/project" id="repo" name="repo">
-	<input id="image_tag" name="image_tag" type="hidden" value="golang-1.10">
-      </div>
-
-      <div class="col-xs-12 col-sm-1">
-	<span class="input-group-btn">
-	  <button class="btn btn-block btn-info" type="submit"><span class="glyphicon glyphicon-wrench"></span> Run</button>
-	</span>
-      </div>
-
-      <div class="col-xs-12 col-sm-1">
-	<div class="dropdown">
-	  <button class="btn btn-block btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-	    Version
-	    <span class="caret"></span>
-	  </button>
-	  <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-	    <li class="dropdown-header">Golang</li>
-	    <li><a onclick="$('#image_tag').val('golang-1.10');">1.10</a></li>
-	    <li><a onclick="$('#image_tag').val('golang-1.9');">1.9</a></li>
-	    <li><a onclick="$('#image_tag').val('golang-1.8');">1.8</a></li>
-	    <!-- <li role="separator" class="divider"></li> -->
-	  </ul>
-	</div>
-      </div>
+{{define "breadcrumb"}} {{end}} {{define "head"}} {{end}} {{define "footer"}} {{end}} {{define "content"}}
+<form method="GET" action="/go/" class="jumbotron">
+  <h1 class="display-6">Test coverage</h1>
+  <div class="row md-form">
+    <div class="col-md-6">
+      <input type="text" class="form-control" placeholder="e.g. github.com/user/project" id="repo" name="repo" />
     </div>
-
-
+    <div class="col-md-3">
+      <select class="browser-default" searchable="Search here.." name="tag">
+        <option value="golang-1.10" selected>1.10</option>
+        <option value="golang-1.9">1.9</option>
+        <option value="golang-1.8">1.8</option>
+      </select>
+      <button class="btn btn-primary btn-sm">Run</button>
     </div>
   </div>
 </form>

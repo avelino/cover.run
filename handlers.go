@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -51,11 +52,15 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 
 // HandlerRepo has the result of a repository cover run
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	repo := vars["repo"]
+	repo := r.URL.Query().Get("repo")
 	tag := r.URL.Query().Get("tag")
 	if tag == "" {
 		tag = DefaultTag
+	}
+
+	vars := mux.Vars(r)
+	if repo == "" {
+		repo = vars["repo"]
 	}
 
 	obj, err := repoCover(repo, tag)
@@ -64,7 +69,7 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errLogger.Println(err)
 		}
-
+		repoTmpl := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 		repoTmpl.Execute(w, map[string]interface{}{
 			"Repo":         repo,
 			"Cover":        obj.Cover,
@@ -85,7 +90,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errLogger.Println(err)
 	}
-
+	homeTmpl := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
 	err = homeTmpl.Execute(w, map[string]interface{}{
 		"repositories": repos,
 	})
