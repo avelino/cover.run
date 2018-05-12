@@ -25,7 +25,8 @@
 			</nav>
 			<ul class="breadcrumb">
 				<li>
-					<a href="/">cover.run</a><span class="divider">/</span>
+					<a href="/">cover.run</a>
+					<span class="divider">/</span>
 				</li>
 				{{template "breadcrumb" .}}
 			</ul>
@@ -42,8 +43,7 @@
 							<li>
 								<a class="list-group-item" href="/go/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
 									{{ $obj.Repo }}
-									<span class="badge orange">{{ $obj.Tag }}</span>
-									<span class="badge orange">{{ $obj.Cover }}</span>
+									<span class="badge orange">{{ $obj.Tag }}, {{ $obj.Cover }}</span>
 								</a>
 							</li>
 							{{ end }}
@@ -53,8 +53,10 @@
 			</div>
 			{{end}}
 			<div class="footer-copyright py-3 text-center">
-				&copy; 2018 <a href="https://gocover.run">Cover.run</a>
+				&copy; 2018
+				<a href="https://gocover.run">Cover.run</a>
 			</div>
 		</footer>
 	</body>
+
 </html>
