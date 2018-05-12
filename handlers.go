@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -69,7 +68,6 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errLogger.Println(err)
 		}
-		repoTmpl := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
 		repoTmpl.Execute(w, map[string]interface{}{
 			"Repo":         repo,
 			"Cover":        obj.Cover,
@@ -90,7 +88,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errLogger.Println(err)
 	}
-	homeTmpl := template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
 	err = homeTmpl.Execute(w, map[string]interface{}{
 		"repositories": repos,
 	})
