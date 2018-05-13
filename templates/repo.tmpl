@@ -1,9 +1,5 @@
 {{define "head"}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>{{end}} {{define "footer"}}{{end}} {{define "breadcrumb"}}
-<li>
-  go
-  <span class="divider">/</span>
-</li>
 <li class="active">
   <a href="https://{{.Repo}}" target="_blank">{{.Repo}}</a>
 </li>
@@ -19,8 +15,8 @@
         {{end}}
       </h1>
       <p>
-        <a href="/go/{{.Repo}}?tag={{.Tag}}">
-          <img id="badge" src="/go/{{.Repo}}.svg?tag={{.Tag}}&style=flat" alt="{{.Cover}}" />
+        <a href="/{{.Repo}}?tag={{.Tag}}">
+          <img id="badge" src="/{{.Repo}}.svg?tag={{.Tag}}&style=flat" alt="{{.Cover}}" />
         </a>
         <a href="https://goreportcard.com/report/{{.Repo}}" target="_blank">
           <img src="https://goreportcard.com/badge/{{.Repo}}">
@@ -33,7 +29,7 @@
       <hr class="my-4" />
 
       <h4>Markdown</h4>
-      <code id="badgemd">![cover.run go](https://cover.run/go/{{.Repo}}.svg?tag={{.Tag}})</code>
+      <code id="badgemd">![GoCover.run](https://gocover.run/{{.Repo}}.svg?tag={{.Tag}})</code>
       <p style="display: none" id="copybadgecontainer">
         <button class="btn btn-primary btn-sm" id="copybadge" data-clipboard-target="#badgemd">Copy</button>
       </p>
@@ -61,12 +57,12 @@
 
   function update(data) {
     $("#details > samp").text(data.Cover);
-    const imgURL = "/go/{{.Repo}}.svg?tag={{.Tag}}&style=flat&d=" + (new Date()).getTime();
+    const imgURL = "/{{.Repo}}.svg?tag={{.Tag}}&style=flat&d=" + (new Date()).getTime();
     $("#badge").attr("src", imgURL);
   }
   function pollStatus() {
     $.getJSON({
-      url: "/go/{{.Repo}}.json",
+      url: "/{{.Repo}}.json",
       success: (body) => {
         const msg = body.Cover || null;
         if (msg && msg.indexOf("queued") > -1 || msg.indexOf("progress") > -1) {

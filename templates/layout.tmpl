@@ -7,7 +7,6 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 		<meta name="description" content="Go test coverage as a service" />
 		<meta name="author" content="https://kamaleshwar.com">
-		<link rel="canonical" href="{{pageUrl}}" />
 
 		<title>{{if .Repo}}{{.Repo}} - {{end}}GoCover.Run</title>
 
@@ -42,7 +41,7 @@
 						<ul class="list-unstyled">
 							{{ range $obj := .repositories}}
 							<li>
-								<a href="/go/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
+								<a href="/{{ $obj.Repo }}?tag={{ $obj.Tag }}">
 									{{ $obj.Repo }}
 									<span class="badge badge-info">{{ $obj.Tag }}, {{ $obj.Cover }}</span>
 								</a>

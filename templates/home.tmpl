@@ -1,5 +1,5 @@
 {{define "breadcrumb"}} {{end}} {{define "head"}} {{end}} {{define "content"}}
-<form id="coverform" method="POST" action="/go" class="jumbotron  md-form col-md-9 center-block" style="margin-top: 7.5vh">
+<form id="coverform" method="POST" action="/" class="jumbotron  md-form col-md-9 center-block" style="margin-top: 7.5vh">
   <h3 class="h3-responsive mb-3">Run coverage</h3>
   <div class="row">
     <div class="col-md-8">
@@ -31,9 +31,10 @@
       if(!repo) {
         e.preventDefault();
       }
-      let url = ["/go", repo].join("/");
+      let url = ["", repo].join("/");
       url = url + "?tag=" + $("#tag").val().trim();
       formDom.attr("action", url);
+      // e.preventDefault();
     });
   });
 </script>

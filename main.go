@@ -325,12 +325,13 @@ func subscribe(qname string) {
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
-	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
-	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
-	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))),
 	)
+
+	r.HandleFunc("/{repo:.*}.json", HandlerRepoJSON)
+	r.HandleFunc("/{repo:.*}.svg", HandlerRepoSVG)
+	r.HandleFunc("/{repo:.*}", HandlerRepo)
 
 	go subscribe(coverQName)
 
