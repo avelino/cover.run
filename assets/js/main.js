@@ -6,12 +6,12 @@
 		if (!url) url = window.location.href;
 		name = name.replace(/[\[\]]/g, "\\$&");
 		var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-		results = regex.exec(url);
+			results = regex.exec(url);
 		if (!results) return null;
 		if (!results[2]) return '';
 		return decodeURIComponent(results[2].replace(/\+/g, " "));
 	}
-	
+
 	function clipboard() {
 		if (!window.ClipboardJS || clipboardBind) {
 			return;
@@ -25,20 +25,21 @@
 			return;
 		}
 
-		const url = ["", data.Repo + ".svg?style=flat&d="].join("/");
+		const url = ["", data.Repo + ".svg?style=flat&tag=" + data.Tag + "&d="].join("/");
 		$("#badge").attr("src", url + (new Date()).getTime());
+
+		const mdurl = ["https://gocover.run", data.Repo + ".svg?style=flat&tag=" + data.Tag].join("/");
 
 		const params = jQuery.param({
 			tag: data.Tag,
 			repo: data.Repo
 		});
-		const mdurl = ["https://gocover.run", data.Repo + ".svg?style=flat"].join("/");
 
 		const bdg = "[![gocover.run](" + mdurl + ")](https://gocover.run?" + params + ")";
 
 		$("#mdbadge").text(bdg)
 		$("#details").text(data.Cover)
-		
+
 		if (!clipboardBind) {
 			$("#coverage").fadeIn();
 			clipboard();
