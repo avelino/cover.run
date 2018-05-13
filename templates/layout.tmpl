@@ -5,10 +5,11 @@
 		<meta charset="utf-8" />
 		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-		<meta name="description" content="Cover as a service" />
-		<meta name="author" content="Avelino">
+		<meta name="description" content="Go test coverage as a service" />
+		<meta name="author" content="https://kamaleshwar.com">
+		<link rel="canonical" href="{{pageUrl}}" />
 
-		<title>{{if .Repo}}{{.Repo}} - {{end}}Cover.Run</title>
+		<title>{{if .Repo}}{{.Repo}} - {{end}}GoCover.Run</title>
 
 		<link href="/assets/css/bootstrap.min.css" rel="stylesheet" />
 		<link href="/assets/css/mdb.min.css" rel="stylesheet" />
@@ -21,11 +22,11 @@
 	<body>
 		<header>
 			<nav class="navbar navbar-expand-lg navbar-dark indigo">
-				<a class="navbar-brand" href="/">Cover.Run</a>
+				<a class="navbar-brand" href="/">GoCover.Run</a>
 			</nav>
 			<ul class="breadcrumb">
 				<li>
-					<a href="/">cover.run</a>
+					<a href="/">GoCover.run</a>
 					<span class="divider">/</span>
 				</li>
 				{{template "breadcrumb" .}}
@@ -53,11 +54,19 @@
 			</div>
 			{{end}}
 			<div class="footer-copyright py-3 text-center">
+				<a href="/">GoCover.run</a>
 				&copy; 2018
-				<a href="/">Cover.run</a>
 			</div>
 			{{template "footer" .}}
 		</footer>
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-87375749-2"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag() { dataLayer.push(arguments); }
+			gtag('js', new Date());
+			gtag('config', 'UA-87375749-2');
+		</script>
 	</body>
 
 </html>
