@@ -86,8 +86,7 @@ var (
 		PoolTimeout:  time.Second * 120,
 	})
 
-	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
-	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
+	pageTmpl = template.Must(template.ParseFiles("./templates/page.tmpl"))
 )
 
 // imageSupported returns true if the given Go version is supported
@@ -331,7 +330,6 @@ func main() {
 
 	r.HandleFunc("/{repo:.*}.json", HandlerRepoJSON)
 	r.HandleFunc("/{repo:.*}.svg", HandlerRepoSVG)
-	r.HandleFunc("/{repo:.*}", HandlerRepo)
 
 	go subscribe(coverQName)
 

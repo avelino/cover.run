@@ -107,7 +107,6 @@ func setup() (*mux.Router, *httptest.ResponseRecorder) {
 	r.HandleFunc("/", Handler)
 	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
 	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
-	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	return r, httptest.NewRecorder()
 }
 func TestHandler(t *testing.T) {
@@ -147,23 +146,6 @@ func TestHandlerRepoJSON(t *testing.T) {
 func TestHandlerRepoSVG(t *testing.T) {
 	router, respRec := setup()
 	url := "http://localhost/go/github.com/avelino/cover.run.svg?tag=golang-1.10"
-
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
-	if err != nil {
-		t.Log(err)
-		t.Fail()
-	}
-	router.ServeHTTP(respRec, req)
-
-	if respRec.Code != 200 {
-		t.Log("Expected 200, got", respRec.Code)
-		t.Fail()
-	}
-}
-
-func TestHandlerRepo(t *testing.T) {
-	router, respRec := setup()
-	url := "http://localhost/go/github.com/avelino/cover.run?tag=golang-1.10"
 
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
 	if err != nil {
