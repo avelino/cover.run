@@ -18,7 +18,7 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	repo := strings.TrimSpace(vars["repo"])
 
 	obj, err := repoCover(repo, tag)
-	if err == nil || err == ErrCovInPrgrs || err == ErrQueued {
+	if err == nil || err == ErrCovInPrgrs || err == ErrQueued || err == ErrNoTest {
 		if err != nil {
 			obj.Cover = err.Error()
 		}

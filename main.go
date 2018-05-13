@@ -59,9 +59,11 @@ var (
 	// ErrUnknown is the error returned when an unidentified error is encountered
 	ErrUnknown = errors.New("Unknown error occurred")
 	// ErrQueued is the error returned when the cover run queueu is full
-	ErrQueued = errors.New("Cover run request queued")
+	ErrQueued = errors.New("Request queued")
 	// ErrCovInPrgrs is the error returned when the repo coverage test is in progress
-	ErrCovInPrgrs = errors.New("Cover run is in progress")
+	ErrCovInPrgrs = errors.New("Test in progress")
+	// ErrNoTest is the error returned when no tests are found in the repository
+	ErrNoTest = errors.New("No tests found")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -240,6 +242,9 @@ func cover(repo, tag string) error {
 		errLogger.Println(rerr)
 	}
 	<-qChan
+	if err == nil && obj.Cover == "" {
+		return ErrNoTest
+	}
 	return err
 }
 
