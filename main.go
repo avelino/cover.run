@@ -242,9 +242,11 @@ func cover(repo, tag string) error {
 		errLogger.Println(rerr)
 	}
 	<-qChan
+
 	if err == nil && obj.Cover == "" {
 		return ErrNoTest
 	}
+
 	return err
 }
 
@@ -263,6 +265,10 @@ func repoCover(repo, imageTag string) (*Object, error) {
 	}
 
 	errLogger.Println(err)
+
+	if obj.Cover == ErrNoTest.Error() {
+		return obj, ErrNoTest
+	}
 
 	if !imageSupported(imageTag) {
 		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
