@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -16,6 +17,9 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	obj, err := repoCover(vars["repo"], tag)
 	if err == nil || err == ErrCovInPrgrs || err == ErrQueued {
+		if err != nil {
+			obj.Cover = err.Error()
+		}
 		json.NewEncoder(w).Encode(obj)
 		return
 	}
@@ -51,19 +55,23 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 
 // HandlerRepo has the result of a repository cover run
 func HandlerRepo(w http.ResponseWriter, r *http.Request) {
-	repo := r.URL.Query().Get("repo")
-	tag := r.URL.Query().Get("tag")
+	repo := strings.TrimSpace(r.URL.Query().Get("repo"))
+	tag := strings.TrimSpace(r.URL.Query().Get("tag"))
 	if tag == "" {
 		tag = DefaultTag
 	}
 
 	vars := mux.Vars(r)
 	if repo == "" {
-		repo = vars["repo"]
+		repo = strings.TrimSpace(vars["repo"])
 	}
 
 	obj, err := repoCover(repo, tag)
 	if err == nil || err == ErrCovInPrgrs || err == ErrQueued {
+		loading := false
+		if err == ErrCovInPrgrs || err == ErrQueued {
+			loading = true
+		}
 		repos, err := repoLatest()
 		if err != nil {
 			errLogger.Println(err)
@@ -71,6 +79,18 @@ func HandlerRepo(w http.ResponseWriter, r *http.Request) {
 		repoTmpl.Execute(w, map[string]interface{}{
 			"Repo":         repo,
 			"Cover":        obj.Cover,
+			"Tag":          obj.Tag,
+			"repositories": repos,
+			"Loading":      loading,
+		})
+		return
+	}
+
+	if err == ErrUnknown {
+		repos, _ := repoLatest()
+		repoTmpl.Execute(w, map[string]interface{}{
+			"Repo":         repo,
+			"Cover":        ErrUnknown.Error(),
 			"Tag":          obj.Tag,
 			"repositories": repos,
 		})

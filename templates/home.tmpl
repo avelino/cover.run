@@ -1,5 +1,5 @@
 {{define "breadcrumb"}} {{end}} {{define "head"}} {{end}} {{define "content"}}
-<form id="coverform" method="GET" action="/go/" class="jumbotron  md-form col-md-9 center-block" style="margin-top: 7.5vh">
+<form id="coverform" method="POST" action="/go" class="jumbotron  md-form col-md-9 center-block" style="margin-top: 7.5vh">
   <h3 class="h3-responsive mb-3">Run coverage</h3>
   <div class="row">
     <div class="col-md-8">
@@ -23,13 +23,17 @@
 {{define "footer"}}
 <script>
   $(document).ready(() => {
-    var repDom = $("#repo");
+    const repDom = $("#repo");
+    const formDom = $("#coverform");
     $("#coverform").submit((e) => {
       const repo = repDom.val().trim();
       repDom.val(repo);
       if(!repo) {
         e.preventDefault();
       }
+      let url = ["/go", repo].join("/");
+      url = url + "?tag=" + $("#tag").val().trim();
+      formDom.attr("action", url);
     });
   });
 </script>

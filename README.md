@@ -1,5 +1,5 @@
 # cover.run
-[![Build Status](https://travis-ci.org/avelino/cover.run.svg?branch=master)](https://travis-ci.org/avelino/cover.run)
+[![Build Status](https://travis-ci.org/bnkamalesh/cover.run.svg?branch=master)](https://travis-ci.org/bnkamalesh/cover.run)
 
 ## Supported
 
@@ -17,6 +17,6 @@
 ### How to run?
 
 ```bash
-$ cd $GOPATH/src/github.com/avelino/cover.run
+$ cd $GOPATH/src/github.com/bnkamalesh/cover.run
 $ docker-compose up
 ```

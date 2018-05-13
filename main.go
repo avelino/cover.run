@@ -272,6 +272,7 @@ func repoCover(repo, imageTag string) (*Object, error) {
 	err = addToQ(repo, imageTag)
 	if err != nil {
 		errLogger.Println(err)
+		return obj, ErrUnknown
 	}
 
 	return obj, ErrQueued
