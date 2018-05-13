@@ -1,9 +1,8 @@
-# cover.run
 [![Build Status](https://travis-ci.org/bnkamalesh/cover.run.svg?branch=master)](https://travis-ci.org/bnkamalesh/cover.run)
 
-## Supported
+# [gocover.run](https://gocover.run)
 
-### Golang
+gocover - Generate test coverage badges for Go packages on Github. It supports the following Go versions
 
 - 1.10
 - 1.9

@@ -184,13 +184,12 @@ func coverageBadge(repo, tag, style string) (string, error) {
 	if err != nil {
 		badgeStatus = "error"
 	}
-	var color string
+
+	color := "red"
 	if cover >= 70 {
 		color = "green"
 	} else if cover >= 45 {
 		color = "yellow"
-	} else {
-		color = "red"
 	}
 
 	return getBadge(color, style, badgeStatus), nil
