@@ -10,24 +10,16 @@ import (
 
 // HandlerRepoJSON returns the coverage details of a repository as JSON
 func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	tag := strings.TrimSpace(r.URL.Query().Get("tag"))
-	if tag == "" {
-		tag = DefaultTag
+	goversion := strings.TrimSpace(r.URL.Query().Get("tag"))
+	if goversion == "" {
+		goversion = DefaultTag
 	}
+
+	vars := mux.Vars(r)
 	repo := strings.TrimSpace(vars["repo"])
 
-	obj, err := repoCover(repo, tag)
-	if err == nil || err == ErrCovInPrgrs || err == ErrQueued || err == ErrNoTest {
-		if err != nil {
-			obj.Cover = err.Error()
-		}
-		json.NewEncoder(w).Encode(obj)
-		return
-	}
-
-	errLogger.Println(err)
-	http.Error(w, err.Error(), http.StatusInternalServerError)
+	obj, _ := repoCover(repo, goversion)
+	json.NewEncoder(w).Encode(obj)
 }
 
 // HandlerRepoSVG returns the SVG badge with coverage for a given repository

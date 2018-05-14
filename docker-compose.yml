@@ -1,22 +1,28 @@
 version: "2"
 services:
   cover.run:
+    image: bnkamalesh/cover.run:latest
     privileged: true
     build: .
     links:
-      - redis:redis
+      - redis
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - 3000
+    restart: on-failure:3
+
   redis:
     image: redis
+    restart: on-failure:3
+
   caddy:
     image: abiosoft/caddy
     volumes:
       - ./Caddyfile:/etc/Caddyfile
       - ./assets:/srv/assets
     links:
-      - cover.run:cover.run
+      - cover.run
     ports:
       - 80:2015
+    restart: on-failure:3

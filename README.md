@@ -10,8 +10,8 @@ gocover - Generate test coverage badge for any public Go package. Supported Go v
 
 ### Supported badge styles
 
-- flat [![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat)]
-- flat-square [![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square)]
+- flat ![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat)
+- flat-square ![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square)
 
 Style is specified as a query string parameter, e.g. `https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square`
 
