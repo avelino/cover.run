@@ -3,9 +3,15 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
+)
+
+var (
+	regGithub  = regexp.MustCompile(`(?i)^(github.com)(.*)$`)
+	replaceStr = "github.com$2"
 )
 
 // HandlerRepoJSON returns the coverage details of a repository as JSON
@@ -16,6 +22,7 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 		tag = DefaultTag
 	}
 	repo := strings.TrimSpace(vars["repo"])
+	repo = regGithub.ReplaceAllString(repo, replaceStr)
 
 	obj, err := repoCover(repo, tag)
 	if err == nil || err == ErrCovInPrgrs || err == ErrQueued || err == ErrNoTest {
@@ -38,6 +45,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		tag = DefaultTag
 	}
 	repo := strings.TrimSpace(vars["repo"])
+	repo = regGithub.ReplaceAllString(repo, replaceStr)
 
 	badgeStyle := strings.TrimSpace(r.URL.Query().Get("style"))
 	if badgeStyle != "flat" {

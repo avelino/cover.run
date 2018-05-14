@@ -261,7 +261,7 @@ func repoCover(repo, imageTag string) (*Object, error) {
 	}
 
 	if !imageSupported(imageTag) {
-		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
+		obj.Cover = fmt.Sprintf("Sorry, unsupported Go version %s", imageTag)
 		return obj, ErrImgUnSupported
 	}
 
