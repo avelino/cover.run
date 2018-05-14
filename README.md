@@ -2,11 +2,18 @@
 
 # [gocover.run](https://gocover.run)
 
-gocover - Generate test coverage badges for Go packages on Github. It supports the following Go versions
+gocover - Generate test coverage badge for any public Go package. Supported Go versions
 
 - 1.10
 - 1.9
 - 1.8
+
+### Supported badge styles
+
+- flat [![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat)]
+- flat-square [![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square)]
+
+Style is specified as a query string parameter, e.g. `https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square`
 
 ### Pre-requisites
 
