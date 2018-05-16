@@ -48,7 +48,7 @@ func getBadgeImgShield(color, style, percent string) string {
 	}
 	errLogger.Println(err)
 
-	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
+	imgURL := fmt.Sprintf("https://img.shields.io/badge/gocover.run-%s25-%s.svg?style=%s", percent, color, style)
 
 	resp, err := httpClient.Get(imgURL)
 	if err != nil {
@@ -73,7 +73,7 @@ func getBadgeImgShield(color, style, percent string) string {
 
 // getBadge is a function which will generate SVG rather than fetch from img.shield.io
 func getBadge(color, style, status string) string {
-	const label = "cover.run"
+	const label = "coverage"
 	buf := new(bytes.Buffer)
 	switch strings.ToLower(color) {
 	case "red":
@@ -184,13 +184,12 @@ func coverageBadge(repo, tag, style string) (string, error) {
 	if err != nil {
 		badgeStatus = "error"
 	}
-	var color string
+
+	color := "red"
 	if cover >= 70 {
 		color = "green"
 	} else if cover >= 45 {
 		color = "yellow"
-	} else {
-		color = "red"
 	}
 
 	return getBadge(color, style, badgeStatus), nil

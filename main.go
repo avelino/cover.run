@@ -33,7 +33,7 @@ const (
 
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
-	DefaultTag = "golang-1.10"
+	DefaultTag = "1.10"
 )
 
 var (
@@ -59,9 +59,11 @@ var (
 	// ErrUnknown is the error returned when an unidentified error is encountered
 	ErrUnknown = errors.New("Unknown error occurred")
 	// ErrQueued is the error returned when the cover run queueu is full
-	ErrQueued = errors.New("Cover run request queued")
+	ErrQueued = errors.New("Request queued")
 	// ErrCovInPrgrs is the error returned when the repo coverage test is in progress
-	ErrCovInPrgrs = errors.New("Cover run is in progress")
+	ErrCovInPrgrs = errors.New("Test in progress")
+	// ErrNoTest is the error returned when no tests are found in the repository
+	ErrNoTest = errors.New("No tests found")
 
 	redisRing = redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -86,16 +88,15 @@ var (
 		PoolTimeout:  time.Second * 120,
 	})
 
-	repoTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/repo.tmpl"))
-	homeTmpl = template.Must(template.ParseFiles("./templates/layout.tmpl", "./templates/home.tmpl"))
+	pageTmpl = template.Must(template.ParseFiles("./templates/page.tmpl"))
 )
 
-// imageSupported returns true if the given Go version is supported
-func imageSupported(tag string) bool {
-	switch tag {
-	case "golang-1.10",
-		"golang-1.9",
-		"golang-1.8":
+// goversionSupported returns true if the given Go version is supported
+func goversionSupported(version string) bool {
+	switch version {
+	case "1.10",
+		"1.9",
+		"1.8":
 		return true
 	}
 	return false
@@ -119,7 +120,7 @@ func repoExists(repo string) (bool, error) {
 }
 
 // run runs the custom script to get the coverage details; using gofn
-func run(imageRepoName, dockerTag, repo string) (string, string, error) {
+func run(goversion, repo string) (string, string, error) {
 	_, err := repoExists(repo)
 	if err != nil {
 		return "", "", err
@@ -127,7 +128,7 @@ func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 
 	buildOpts := &provision.BuildOptions{
 		DoNotUsePrefixImageName: true,
-		ImageName:               strings.ToLower(fmt.Sprintf("%s:%s", imageRepoName, dockerTag)),
+		ImageName:               strings.ToLower(fmt.Sprintf("bnkamalesh/cover.go:%s", goversion)),
 		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
 
@@ -137,7 +138,7 @@ func run(imageRepoName, dockerTag, repo string) (string, string, error) {
 
 	StdOut, StdErr, err := gofn.Run(ctx, buildOpts, &provision.ContainerOptions{})
 	if err != nil {
-		errLogger.Println(err)
+		errLogger.Println(err, buildOpts)
 	}
 
 	return StdOut, StdErr, err
@@ -206,10 +207,10 @@ func unsetInProgress(repo, tag string) error {
 // cover evaluates the coverage of a repository
 // - Before starting evaluation, it sets the repo's status as in progress
 // - Removes the inprogress status of a repo after it's done
-func cover(repo, tag string) error {
-	setInProgress(repo, tag)
+func cover(repo, goversion string) error {
+	setInProgress(repo, goversion)
 
-	StdOut, StdErr, err := run("avelino/cover.run", tag, repo)
+	StdOut, StdErr, err := run(goversion, repo)
 	if err != nil {
 		errLogger.Println(err)
 		if len(StdErr) == 0 {
@@ -217,11 +218,24 @@ func cover(repo, tag string) error {
 		}
 	}
 
-	unsetInProgress(repo, tag)
+	if len(StdErr) == 0 {
+		switch err {
+		case ErrCovInPrgrs, ErrImgUnSupported, ErrQueued, ErrNoTest:
+			{
+				StdErr = err.Error()
+			}
+		default:
+			{
+				errLogger.Println(err)
+			}
+		}
+	}
+
+	unsetInProgress(repo, goversion)
 
 	obj := &Object{
 		Repo:   repo,
-		Tag:    tag,
+		Tag:    goversion,
 		Cover:  StdErr,
 		Output: false,
 	}
@@ -233,7 +247,7 @@ func cover(repo, tag string) error {
 	}
 
 	rerr := redisCodec.Set(&cache.Item{
-		Key:        repoFullName(repo, tag),
+		Key:        repoFullName(repo, goversion),
 		Object:     obj,
 		Expiration: time.Hour,
 	})
@@ -241,6 +255,11 @@ func cover(repo, tag string) error {
 		errLogger.Println(rerr)
 	}
 	<-qChan
+
+	if err == nil && obj.Cover == "" {
+		return ErrNoTest
+	}
+
 	return err
 }
 
@@ -253,26 +272,34 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		Repo: repo,
 		Tag:  imageTag,
 	}
+
+	if !goversionSupported(imageTag) {
+		obj.Cover = ErrImgUnSupported.Error()
+		return obj, ErrImgUnSupported
+	}
+
 	err := redisCodec.Get(repoFullName(repo, imageTag), &obj)
 	if err == nil {
 		return obj, nil
 	}
-
 	errLogger.Println(err)
 
-	if !imageSupported(imageTag) {
-		obj.Cover = fmt.Sprintf("Sorry, docker image not found, avelino/cover.run:%s, see Supported languages: https://github.com/avelino/cover.run#supported", imageTag)
-		return obj, ErrImgUnSupported
+	inprogress, err := repoCoverStatus(repo, imageTag)
+	if err != nil {
+		errLogger.Println(err)
 	}
-
-	if ok, _ := repoCoverStatus(repo, imageTag); ok {
+	if inprogress {
+		obj.Cover = ErrCovInPrgrs.Error()
 		return obj, ErrCovInPrgrs
 	}
 
 	err = addToQ(repo, imageTag)
 	if err != nil {
 		errLogger.Println(err)
+		return obj, ErrUnknown
 	}
+
+	obj.Cover = ErrQueued.Error()
 
 	return obj, ErrQueued
 }
@@ -307,11 +334,7 @@ func repoLatest() ([]*Repository, error) {
 
 // subscribe subscribes to the Redis channel
 func subscribe(qname string) {
-	pubsub, err := redisClient.Subscribe(qname)
-	if err != nil {
-		errLogger.Println(err)
-		return
-	}
+	pubsub := redisClient.Subscribe(qname)
 	defer pubsub.Close()
 
 	for {
@@ -328,12 +351,12 @@ func subscribe(qname string) {
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
-	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
-	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
-	r.HandleFunc("/go/{repo:.*}", HandlerRepo)
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))),
 	)
+
+	r.HandleFunc("/{repo:.*}.json", HandlerRepoJSON)
+	r.HandleFunc("/{repo:.*}.svg", HandlerRepoSVG)
 
 	go subscribe(coverQName)
 

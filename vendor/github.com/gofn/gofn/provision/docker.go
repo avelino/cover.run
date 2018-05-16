@@ -79,16 +79,13 @@ func FnContainer(client *docker.Client, opts ContainerOptions) (container *docke
 		OpenStdin: true,
 	}
 	var uid uuid.UUID
-	uid, err = uuid.NewV4()
-	if err != nil {
-		return
-	}
+	uid = uuid.NewV4()
 	container, err = client.CreateContainer(docker.CreateContainerOptions{
 		Name:       fmt.Sprintf("gofn-%s", uid.String()),
 		HostConfig: &docker.HostConfig{Binds: opts.Volumes},
 		Config:     config,
 	})
-	return
+	return container, err
 }
 
 // FnImageBuild builds an image
