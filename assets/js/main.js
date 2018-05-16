@@ -1,4 +1,5 @@
 (function ($) {
+	const baseURI = "/go";
 	const pollInterval = 3000;
 	let clipboardBind = false;
 
@@ -25,17 +26,17 @@
 			return;
 		}
 
-		const url = ["", data.Repo + ".svg?style=flat&tag=" + data.Tag + "&d="].join("/");
+		const url = [baseURI, data.Repo + ".svg?style=flat&tag=" + data.Tag + "&d="].join("/");
 		$("#badge").attr("src", url + (new Date()).getTime());
 
-		const mdurl = ["https://gocover.run", data.Repo + ".svg?style=flat&tag=" + data.Tag].join("/");
+		const mdurl = ["https://cover.run/go", data.Repo + ".svg?style=flat&tag=" + data.Tag].join("/");
 
 		const params = jQuery.param({
 			tag: data.Tag,
 			repo: data.Repo
 		});
 
-		const bdg = "[![gocover.run](" + mdurl + ")](https://gocover.run?" + params + ")";
+		const bdg = "[![cover.run](" + mdurl + ")](https://cover.run/go?" + params + ")";
 
 		$("#mdbadge").text(bdg)
 		$("#details").text(data.Cover)
@@ -55,7 +56,7 @@
 		ldom.attr("class", "inline-block");
 
 		$.getJSON({
-			url: "/" + repo + ".json?tag=" + tag,
+			url: baseURI + "/" + repo + ".json?tag=" + tag,
 			success: function (body) {
 				ldom.attr("class", "hidden");
 				showCoverage(body);
@@ -77,7 +78,7 @@
 		bdom.attr("class", "inline-block");
 
 		$.getJSON({
-			url: "/" + repo + ".json?tag=" + tag,
+			url: baseURI + "/" + repo + ".json?tag=" + tag,
 			success: function (body) {
 				if (!body.Cover) {
 					return;

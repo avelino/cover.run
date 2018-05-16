@@ -47,6 +47,21 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(svg))
 }
 
+// HandlerBadge generates a badge with the given value
+func HandlerBadge(w http.ResponseWriter, r *http.Request) {
+	style := strings.TrimSpace(r.URL.Query().Get("style"))
+	color := strings.TrimSpace(r.URL.Query().Get("color"))
+	value := strings.TrimSpace(r.URL.Query().Get("value"))
+	svg := getBadge(color, style, value)
+
+	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
+	w.Header().Set("pragma", "no-cache")
+	w.Header().Set("expires", "-1")
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Vary", "Accept-Encoding")
+	w.Write([]byte(svg))
+}
+
 // Handler returns the homepage
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := pageTmpl.Execute(w, nil)

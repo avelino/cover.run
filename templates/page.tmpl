@@ -6,7 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="description" content="gocover - Generate test coverage badges for any public Go package" />
 		<meta name="keywords" content="Go, testing, code coverage, code quality" />
-		<meta name="author" content="https://kamaleshwar.com" />
+		<meta name="author" content="https://medium.com/@avelino0" />
 		<title>gocover.run</title>
 		<link href='https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,600' rel='stylesheet' type='text/css' />
 		<link href="/assets/css/base.css" rel="stylesheet" type="text/css" />
@@ -19,21 +19,21 @@
 	<body>
 		<div class="container wrap">
 			<header class="header">
-				<a href="/"><img src="/assets/images/logo.svg" alt="go cover" /></a>
+				<a href="/" style="color: #3f51b5; font-size: 29px; line-height: 32px; text-decoration: none"><strong>cover.run</strong></a>
 			</header>
 
 			<main class="content">
 				<p>Generate test coverage badges for any public Go package</p>
-				<form class="form" method="get" action="/" id="form">
+				<form class="form" method="get" action="/go" id="form">
 					<div class="row">
 						<div class="nine columns">
 							<input type="text" placeholder="eg: github.com/user/project" name="repo" id="repo" />
 						</div>
 						<div class="three columns">
 							<select name="tag" id="tag">
-								<option value="1.10" selected>Go 1.10</option>
-								<option value="1.9">Go 1.9</option>
-								<option value="1.8">Go 1.8</option>
+								<option value="golang-1.10" selected>Go 1.10</option>
+								<option value="golang-1.9">Go 1.9</option>
+								<option value="golang-1.8">Go 1.8</option>
 							</select>
 						</div>
 					</div>
@@ -63,16 +63,16 @@
 			</main>
 
 			<footer class="footer text-small">
-				gocover &copy; 2018,
-				<a href="https://github.com/bnkamalesh/cover.run" target="blank">GitHub source</a>
+				cover.run &copy; 2018,
+				<a href="https://github.com/avelino/cover.run" target="blank">GitHub source</a>
 			</footer>
 		</div>
-		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-87375749-2"></script>
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-96762700-1"></script>
 		<script>
 			window.dataLayer = window.dataLayer || [];
 			function gtag() { dataLayer.push(arguments); }
 			gtag('js', new Date());
-			gtag('config', 'UA-87375749-2');
+			gtag('config', 'UA-96762700-1');
 		</script>
 		<script async src="/assets/js/main.js"></script>
 	</body>

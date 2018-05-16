@@ -73,7 +73,7 @@ func getBadgeImgShield(color, style, percent string) string {
 
 // getBadge is a function which will generate SVG rather than fetch from img.shield.io
 func getBadge(color, style, status string) string {
-	const label = "coverage"
+	const label = "cover.run"
 	buf := new(bytes.Buffer)
 	switch strings.ToLower(color) {
 	case "red":

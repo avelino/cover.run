@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/bnkamalesh/cover.run.svg?branch=master)](https://travis-ci.org/bnkamalesh/cover.run)
+[![Build Status](https://travis-ci.org/avelino/cover.run.svg?branch=master)](https://travis-ci.org/avelino/cover.run)
 
 # [gocover.run](https://gocover.run)
 
@@ -10,10 +10,10 @@ gocover - Generate test coverage badge for any public Go package. Supported Go v
 
 ### Supported badge styles
 
-- flat ![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat)
-- flat-square ![coverage](https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square)
+- flat ![coverage](https://cover.run/badge?color=yellow&style=flat&value=75.5%25)
+- flat-square ![coverage](https://cover.run/badge?color=red&style=flat-square&value=10%25)
 
-Style is specified as a query string parameter, e.g. `https://gocover.run/github.com/bnkamalesh/cover.run.svg?style=flat-square`
+Style is specified as a query string parameter, e.g. `https://gocover.run/github.com/avelino/cover.run.svg?style=flat-square`
 
 ### Pre-requisites
 
@@ -23,6 +23,6 @@ Style is specified as a query string parameter, e.g. `https://gocover.run/github
 ### How to run?
 
 ```bash
-$ cd $GOPATH/src/github.com/bnkamalesh/cover.run
+$ cd $GOPATH/src/github.com/avelino/cover.run
 $ docker-compose up
 ```

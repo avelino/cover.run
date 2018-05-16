@@ -91,12 +91,12 @@ var (
 	pageTmpl = template.Must(template.ParseFiles("./templates/page.tmpl"))
 )
 
-// goversionSupported returns true if the given Go version is supported
-func goversionSupported(version string) bool {
+// langVersionSupported returns true if the given Go version is supported
+func langVersionSupported(version string) bool {
 	switch version {
-	case "1.10",
-		"1.9",
-		"1.8":
+	case "golang-1.10",
+		"golang-1.9",
+		"golang-1.8":
 		return true
 	}
 	return false
@@ -120,7 +120,7 @@ func repoExists(repo string) (bool, error) {
 }
 
 // run runs the custom script to get the coverage details; using gofn
-func run(goversion, repo string) (string, string, error) {
+func run(langVersion, repo string) (string, string, error) {
 	_, err := repoExists(repo)
 	if err != nil {
 		return "", "", err
@@ -128,7 +128,7 @@ func run(goversion, repo string) (string, string, error) {
 
 	buildOpts := &provision.BuildOptions{
 		DoNotUsePrefixImageName: true,
-		ImageName:               strings.ToLower(fmt.Sprintf("bnkamalesh/cover.go:%s", goversion)),
+		ImageName:               strings.ToLower(fmt.Sprintf("avelino/cover.run:%s", langVersion)),
 		StdIN:                   fmt.Sprintf("sh /run.sh %s", repo),
 	}
 
@@ -207,10 +207,10 @@ func unsetInProgress(repo, tag string) error {
 // cover evaluates the coverage of a repository
 // - Before starting evaluation, it sets the repo's status as in progress
 // - Removes the inprogress status of a repo after it's done
-func cover(repo, goversion string) error {
-	setInProgress(repo, goversion)
+func cover(repo, langVersion string) error {
+	setInProgress(repo, langVersion)
 
-	StdOut, StdErr, err := run(goversion, repo)
+	StdOut, StdErr, err := run(langVersion, repo)
 	if err != nil {
 		errLogger.Println(err)
 		if len(StdErr) == 0 {
@@ -231,11 +231,11 @@ func cover(repo, goversion string) error {
 		}
 	}
 
-	unsetInProgress(repo, goversion)
+	unsetInProgress(repo, langVersion)
 
 	obj := &Object{
 		Repo:   repo,
-		Tag:    goversion,
+		Tag:    langVersion,
 		Cover:  StdErr,
 		Output: false,
 	}
@@ -247,7 +247,7 @@ func cover(repo, goversion string) error {
 	}
 
 	rerr := redisCodec.Set(&cache.Item{
-		Key:        repoFullName(repo, goversion),
+		Key:        repoFullName(repo, langVersion),
 		Object:     obj,
 		Expiration: time.Hour,
 	})
@@ -273,7 +273,7 @@ func repoCover(repo, imageTag string) (*Object, error) {
 		Tag:  imageTag,
 	}
 
-	if !goversionSupported(imageTag) {
+	if !langVersionSupported(imageTag) {
 		obj.Cover = ErrImgUnSupported.Error()
 		return obj, ErrImgUnSupported
 	}
@@ -351,12 +351,14 @@ func subscribe(qname string) {
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", Handler)
+	r.HandleFunc("/go", Handler)
 	r.PathPrefix("/assets").Handler(
 		http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))),
 	)
 
-	r.HandleFunc("/{repo:.*}.json", HandlerRepoJSON)
-	r.HandleFunc("/{repo:.*}.svg", HandlerRepoSVG)
+	r.HandleFunc("/go/{repo:.*}.json", HandlerRepoJSON)
+	r.HandleFunc("/go/{repo:.*}.svg", HandlerRepoSVG)
+	r.HandleFunc("/badge", HandlerBadge)
 
 	go subscribe(coverQName)
 
