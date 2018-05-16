@@ -1,7 +1,7 @@
 version: "2"
 services:
   cover.run:
-    image: bnkamalesh/cover.run:latest
+    image: avelino/cover.run:latest
     privileged: true
     build: .
     links:
