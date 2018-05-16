@@ -24,5 +24,7 @@ Style is specified as a query string parameter, e.g. `https://gocover.run/github
 
 ```bash
 $ cd $GOPATH/src/github.com/avelino/cover.run
+# build.sh builds all the required Docker images for running the tests
+$ ./build.sh
 $ docker-compose up
 ```
