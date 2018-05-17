@@ -48,7 +48,7 @@ func getBadgeImgShield(color, style, percent string) string {
 	}
 	errLogger.Println(err)
 
-	imgURL := fmt.Sprintf("https://img.shields.io/badge/gocover.run-%s25-%s.svg?style=%s", percent, color, style)
+	imgURL := fmt.Sprintf("https://img.shields.io/badge/cover.run-%s25-%s.svg?style=%s", percent, color, style)
 
 	resp, err := httpClient.Get(imgURL)
 	if err != nil {
