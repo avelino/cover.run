@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +36,15 @@ const (
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
 	DefaultTag = "1.10"
+	// cacheExpiry is the duration in which the cache will be expired
+	cacheExpiry = time.Hour
+	// refreshWindows is the time duration, in which if the cache is about to expire
+	// cover run is started again.
+	refreshWindow = time.Minute * 10
+
+	// Redis Errors
+	redisErrNil      = "redis: nil"
+	redisErrNotFound = "cache: key is missing"
 )
 
 var (
@@ -89,6 +100,9 @@ var (
 	})
 
 	pageTmpl = template.Must(template.ParseFiles("./templates/page.tmpl"))
+
+	// coverageMatch regex is used to match and find the coverage details from stdout
+	coverageMatch = regexp.MustCompile("([coverage\\: ][0-9]+[.]?[0-9]*?[%])")
 )
 
 // langVersionSupported returns true if the given Go version is supported
@@ -181,7 +195,9 @@ func repoCoverStatus(repo, tag string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	errLogger.Println(err)
+	if err.Error() != redisErrNil {
+		errLogger.Println(err)
+	}
 
 	return false, err
 }
@@ -204,30 +220,42 @@ func unsetInProgress(repo, tag string) error {
 	return err
 }
 
+// computeCoverage returns a string with the final computed coverage value
+// Coverage percentages are read from the string output of go coverage
+func computeCoverage(stdOut string) string {
+	nn := coverageMatch.FindAllString(stdOut, -1)
+	total := float64(0.00)
+	count := float64(0.00)
+	for _, n := range nn {
+		n = strings.TrimSpace(n)
+		n = strings.Trim(n, "%")
+		f, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			continue
+		}
+		total += f
+		count++
+	}
+
+	// to prevent divide by 0
+	if count < 1.0 {
+		count = 1.00
+	}
+	// rounding to 2
+	return fmt.Sprintf("%.2f%%", (total / count))
+}
+
 // cover evaluates the coverage of a repository
 // - Before starting evaluation, it sets the repo's status as in progress
 // - Removes the inprogress status of a repo after it's done
 func cover(repo, langVersion string) error {
 	setInProgress(repo, langVersion)
 
-	StdOut, StdErr, err := run(langVersion, repo)
+	stdOut, stdErr, err := run(langVersion, repo)
 	if err != nil {
 		errLogger.Println(err)
-		if len(StdErr) == 0 {
-			StdErr = err.Error()
-		}
-	}
-
-	if len(StdErr) == 0 {
-		switch err {
-		case ErrCovInPrgrs, ErrImgUnSupported, ErrQueued, ErrNoTest:
-			{
-				StdErr = err.Error()
-			}
-		default:
-			{
-				errLogger.Println(err)
-			}
+		if len(stdErr) == 0 {
+			stdErr = err.Error()
 		}
 	}
 
@@ -236,13 +264,12 @@ func cover(repo, langVersion string) error {
 	obj := &Object{
 		Repo:   repo,
 		Tag:    langVersion,
-		Cover:  StdErr,
+		Cover:  stdErr,
 		Output: false,
 	}
 
-	stdOut := strings.Trim(StdOut, " \n")
 	if stdOut != "" {
-		obj.Cover = stdOut
+		obj.Cover = computeCoverage(stdOut)
 		obj.Output = true
 	}
 
@@ -282,11 +309,16 @@ func repoCover(repo, imageTag string) (*Object, error) {
 	if err == nil {
 		return obj, nil
 	}
-	errLogger.Println(err)
+
+	if err.Error() != redisErrNotFound {
+		errLogger.Println(err)
+	}
 
 	inprogress, err := repoCoverStatus(repo, imageTag)
 	if err != nil {
-		errLogger.Println(err)
+		if err.Error() != redisErrNil {
+			errLogger.Println(err)
+		}
 	}
 	if inprogress {
 		obj.Cover = ErrCovInPrgrs.Error()
