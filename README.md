@@ -4,6 +4,7 @@
 
 cover - Generate test coverage badge for any public Go package. Supported Go versions
 
+- 1.11
 - 1.10
 - 1.9
 - 1.8
