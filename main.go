@@ -108,7 +108,8 @@ var (
 // langVersionSupported returns true if the given Go version is supported
 func langVersionSupported(version string) bool {
 	switch version {
-	case "golang-1.10",
+	case "golang-1.11",
+		"golang-1.10",
 		"golang-1.9",
 		"golang-1.8":
 		return true
