@@ -63,7 +63,7 @@ func HandlerBadge(w http.ResponseWriter, r *http.Request) {
 }
 
 type pageData struct {
-	Versions map[string]string
+	Versions []Version
 }
 
 // Handler returns the homepage

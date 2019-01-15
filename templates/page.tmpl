@@ -29,9 +29,11 @@
 	      <input type="text" placeholder="eg: github.com/user/project" name="repo" id="repo" />
 	    </div>
 	    <div class="three columns">
-        {{ range $v, $name := .Versions }}
-          <option value="{{ $v }}">{{ $name }}</option>
+        <select name="tag" id="tag">
+        {{ range $v := .Versions }}
+          <option value="{{ $v.Tag }}">{{ $v.Name }}</option>
         {{ end }}
+        </select>
 	    </div>
 	  </div>
 	  <div class="row">

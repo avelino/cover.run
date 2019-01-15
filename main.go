@@ -23,11 +23,16 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
-var langSupportedVersions = map[string]string{
-	"golang-1.11": "Go 1.11",
-	"golang-1.10": "Go 1.10",
-	"golang-1.9":  "Go 1.9",
-	"golang-1.8":  "Go 1.8",
+type Version struct {
+	Tag  string
+	Name string
+}
+
+var langSupportedVersions = []Version{
+	{Tag: "golang-1.11", Name: "Go 1.11"},
+	{Tag: "golang-1.10", Name: "Go 1.10"},
+	{Tag: "golang-1.9", Name: "Go 1.9"},
+	{Tag: "golang-1.8", Name: "Go 1.8"},
 }
 
 const (
@@ -114,8 +119,8 @@ var (
 
 // langVersionSupported returns true if the given Go version is supported
 func langVersionSupported(version string) bool {
-	for v, _ := range langSupportedVersions {
-		if v == version {
+	for _, v := range langSupportedVersions {
+		if v.Tag == version {
 			return true
 		}
 	}
