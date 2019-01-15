@@ -36,9 +36,9 @@
 			repo: data.Repo
 		});
 
-		const bdg = "[![cover.run](" + mdurl + ")](https://cover.run/go?" + params + ")";
+		const bdg = "[![cover.run](" + mdurl + ")](https://cover.run/go?" + decodeURI(params) + ")";
 
-		$("#mdbadge").text(decodeURI(bdg));
+		$("#mdbadge").text(bdg);
 		$("#details").text(data.Cover)
 
 		if (!clipboardBind) {
