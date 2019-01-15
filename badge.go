@@ -127,9 +127,9 @@ func getBadge(color, style, status string) string {
 
 	switch style {
 	case "flat", "curve", "flat-curve":
-		curveBadgeTmpl.Execute(buf, b)
+		_ = curveBadgeTmpl.Execute(buf, b)
 	default:
-		flatBadgeTmpl.Execute(buf, b)
+		_ = flatBadgeTmpl.Execute(buf, b)
 	}
 
 	return buf.String()
