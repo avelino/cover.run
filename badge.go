@@ -78,26 +78,15 @@ func getBadge(color, style, status string) string {
 	buf := new(bytes.Buffer)
 	switch strings.ToLower(color) {
 	case "red":
-		{
-			color = "#d6604a"
-		}
+		color = "#d6604a"
 	case "green":
-		{
-			color = "#96c40f"
-		}
+		color = "#96c40f"
 	case "yellow":
-		{
-			color = "#d6ae22"
-		}
+		color = "#d6ae22"
 	case "yellowgreen":
-		{
-			color = "#a4a61d"
-		}
-
+		color = "#a4a61d"
 	default:
-		{
-			color = "#9a9a9a"
-		}
+		color = "#9a9a9a"
 	}
 
 	b := &badge{
@@ -108,60 +97,41 @@ func getBadge(color, style, status string) string {
 
 	switch len(b.Status) {
 	case 1:
-		{
-			b.StatusX = 725
-			b.Width = 78
-		}
+		b.StatusX = 725
+		b.Width = 78
 	case 2:
-		{
-			b.StatusX = 745
-			b.Width = 90
-		}
+		b.StatusX = 745
+		b.Width = 90
 	case 3:
-		{
-			b.StatusX = 775
-			b.Width = 96
-		}
+		b.StatusX = 775
+		b.Width = 96
 	case 4:
-		{
-			b.StatusX = 815
-			b.Width = 104
-		}
+		b.StatusX = 815
+		b.Width = 104
 	case 5:
-		{
-			b.StatusX = 835
-			b.Width = 108
-		}
+		b.StatusX = 835
+		b.Width = 108
 	case 6:
-		{
-			b.StatusX = 865
-			b.Width = 114
-		}
+		b.StatusX = 865
+		b.Width = 114
 	case 7, 8, 9:
-		{
-			b.StatusX = 895
-			b.Width = 120
-		}
+		b.StatusX = 895
+		b.Width = 120
 
 	default:
-		{
-			// 50units for 7 chars
-			statusWidth := (len(b.Status) * 8)
-			b.StatusX = 685 + (statusWidth + 160)
-			b.Width = 61 + statusWidth + 32
-		}
+		// 50units for 7 chars
+		statusWidth := (len(b.Status) * 8)
+		b.StatusX = 685 + (statusWidth + 160)
+		b.Width = 61 + statusWidth + 32
 	}
 
 	switch style {
 	case "flat", "curve", "flat-curve":
-		{
-			curveBadgeTmpl.Execute(buf, b)
-		}
+		curveBadgeTmpl.Execute(buf, b)
 	default:
-		{
-			flatBadgeTmpl.Execute(buf, b)
-		}
+		flatBadgeTmpl.Execute(buf, b)
 	}
+
 	return buf.String()
 }
 
