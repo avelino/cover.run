@@ -38,7 +38,7 @@
 
 		const bdg = "[![cover.run](" + mdurl + ")](https://cover.run/go?" + params + ")";
 
-		$("#mdbadge").text(bdg)
+		$("#mdbadge").text(decodeURI(bdg));
 		$("#details").text(data.Cover)
 
 		if (!clipboardBind) {
