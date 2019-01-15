@@ -8,8 +8,8 @@ services:
 
 install:
   - ls -alh
-  - cp dockers/golang/run.sh dockers/golang/1.10/run.sh
-  - docker build -t avelino/cover.run:golang-1.10 ./dockers/golang/1.10
+  - cp build/docker/golang/run.sh build/docker/golang/1.10/run.sh
+  - docker build -t avelino/cover.run:golang-1.10 ./build/docker/golang/1.10
 
 matrix:
   fast_finish: true
