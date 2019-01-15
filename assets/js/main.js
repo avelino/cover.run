@@ -30,7 +30,7 @@
     $("#badge").attr("src", url + (new Date()).getTime());
 
     const mdurl = ["https://cover.run/go", data.Repo + ".svg?style=flat&tag=" + data.Tag].join("/");
-    const bdg = ["[![cover.run](", mdurl, ")](https://cover.run/go?tag=", tag, "&repo=", repo, ")"].join("");
+    const bdg = ["[![cover.run](", mdurl, ")](https://cover.run/go?tag=", data.Tag, "&repo=", data.Repo, ")"].join("");
 
     $("#mdbadge").text(bdg);
     $("#details").text(data.Cover)
