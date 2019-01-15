@@ -23,6 +23,13 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
+var langSupportedVersions = map[string]string{
+	"golang-1.11": "Go 1.11",
+	"golang-1.10": "Go 1.10",
+	"golang-1.9":  "Go 1.9",
+	"golang-1.8":  "Go 1.8",
+}
+
 const (
 	// coverQMax is the maximum number of coverage run to be executed simultaneously
 	coverQMax = 5
@@ -107,11 +114,10 @@ var (
 
 // langVersionSupported returns true if the given Go version is supported
 func langVersionSupported(version string) bool {
-	switch version {
-	case "golang-1.10",
-		"golang-1.9",
-		"golang-1.8":
-		return true
+	for v, _ := range langSupportedVersions {
+		if v == version {
+			return true
+		}
 	}
 	return false
 }

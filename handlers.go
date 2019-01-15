@@ -62,10 +62,17 @@ func HandlerBadge(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(svg))
 }
 
+type pageData struct {
+	Versions map[string]string
+}
+
 // Handler returns the homepage
 func Handler(w http.ResponseWriter, r *http.Request) {
-	err := pageTmpl.Execute(w, nil)
-	if err != nil {
+	bind := pageData{
+		Versions: langSupportedVersions,
+	}
+
+	if err := pageTmpl.Execute(w, bind); err != nil {
 		errLogger.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
