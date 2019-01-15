@@ -164,5 +164,5 @@ func coverageBadge(repo, tag, style string) (string, error) {
 	}
 
 	status := strconv.FormatFloat(math.Round(percent*100)/100, 'f', -1, 64)
-	return getBadge(color, style, status), nil
+	return getBadge(color, style, status+"%"), nil
 }
