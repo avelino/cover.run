@@ -1,4 +1,3 @@
-sudo: required
 language: go
 go:
   - 1.11.x
@@ -8,7 +7,8 @@ services:
   - docker
 
 install:
-  - cp ./dockers/golang/run.sh ./dockers/golang/1.10/run.sh
+  - ls -alh
+  - cp dockers/golang/run.sh dockers/golang/1.10/run.sh
   - docker build -t avelino/cover.run:golang-1.10 ./dockers/golang/1.10
 
 matrix:
