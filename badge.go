@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 	"text/template"
@@ -179,18 +180,19 @@ func coverageBadge(repo, tag, style string) (string, error) {
 		errLogger.Println(err)
 	}
 
-	badgeStatus := obj.Cover
-	cover, err := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
+	var color = "red"
+
+	percent, err := strconv.ParseFloat(strings.Replace(obj.Cover, "%", "", -1), 64)
 	if err != nil {
-		badgeStatus = "error"
+		return getBadge(color, style, "error"), nil
 	}
 
-	color := "red"
-	if cover >= 70 {
+	if percent >= 70 {
 		color = "green"
-	} else if cover >= 45 {
+	} else if percent >= 45 {
 		color = "yellow"
 	}
 
-	return getBadge(color, style, badgeStatus), nil
+	status := strconv.FormatFloat(math.Round(percent*100)/100, 'f', -1, 64)
+	return getBadge(color, style, status), nil
 }
