@@ -7,7 +7,6 @@ services:
   - docker
 
 install:
-  - ls -alh
   - cp build/docker/golang/run.sh build/docker/golang/1.10/run.sh
   - docker build -t avelino/cover.run:golang-1.10 ./build/docker/golang/1.10
 
