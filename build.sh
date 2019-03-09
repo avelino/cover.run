@@ -1,6 +1,10 @@
 #!/bin/bash
 
 echo "Building Go images required for testing coverage"
+cp ./dockers/Golang/run.sh ./dockers/Golang/1.12/run.sh
+docker build --tag avelino/cover.run:golang-1.12 ./dockers/Golang/1.12
+rm ./dockers/Golang/1.12/run.sh
+
 cp ./dockers/Golang/run.sh ./dockers/Golang/1.11/run.sh
 docker build --tag avelino/cover.run:golang-1.11 ./dockers/Golang/1.11
 rm ./dockers/Golang/1.11/run.sh
