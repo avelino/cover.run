@@ -35,7 +35,7 @@ const (
 
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
-	DefaultTag = "1.10"
+	DefaultTag = "1.12"
 	// cacheExpiry is the duration in which the cache will be expired
 	cacheExpiry = time.Hour
 	// refreshWindows is the time duration, in which if the cache is about to expire
@@ -108,7 +108,9 @@ var (
 // langVersionSupported returns true if the given Go version is supported
 func langVersionSupported(version string) bool {
 	switch version {
-	case "golang-1.10",
+	case "golang-1.12",
+		"golang-1.11",
+		"golang-1.10",
 		"golang-1.9",
 		"golang-1.8":
 		return true
