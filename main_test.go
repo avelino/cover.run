@@ -11,7 +11,7 @@ import (
 )
 
 func TestImageSupported(t *testing.T) {
-	tt := []string{"1.10", "1.9", "1.8"}
+	tt := []string{"1.12", "1.11", "1.10", "1.9", "1.8"}
 	for _, tag := range tt {
 		if !langVersionSupported("golang-" + tag) {
 			t.Log(tag, " should be suported")
