@@ -1,79 +1,81 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="cover.run - Generate test coverage badges for any public Go package" />
-    <meta name="keywords" content="Go, testing, code coverage, code quality" />
-    <meta name="author" content="https://medium.com/@avelino0" />
-    <title>cover.run</title>
-    <link href='https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,600' rel='stylesheet' type='text/css' />
-    <link href="/assets/css/base.css" rel="stylesheet" type="text/css" />
-    <link href="/assets/css/style.css" rel="stylesheet" type="text/css" />
-    <link rel="shortcut icon" href="/assets/images/favicon.png" type="image/x-icon" />
-    <script src="/assets/js/jquery.min.js"></script>
-    <script src="/assets/js/clipboard.js"></script>
-  </head>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="cover.run - Generate test coverage badges for any public Go package" />
+  <meta name="keywords" content="Go, testing, code coverage, code quality" />
+  <meta name="author" content="https://medium.com/@avelino0" />
 
-  <body>
-    <div class="container wrap">
-      <header class="header">
-	<a href="/" style="color: #3f51b5; font-size: 29px; line-height: 32px; text-decoration: none"><strong>cover.run</strong></a>
-      </header>
+  <title>cover.run</title>
+  <link href='https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,600' rel='stylesheet' type='text/css' />
+  <link href="/assets/css/base.css" rel="stylesheet" type="text/css" />
+  <link href="/assets/css/style.css" rel="stylesheet" type="text/css" />
+  <link rel="shortcut icon" href="/assets/images/favicon.png" type="image/x-icon" />
 
-      <main class="content">
-	<p>Generate test coverage badges for any public Go package</p>
-	<form class="form" method="get" action="/go" id="form">
-	  <div class="row">
-	    <div class="nine columns">
-	      <input type="text" placeholder="eg: github.com/user/project" name="repo" id="repo" />
-	    </div>
-	    <div class="three columns">
- 	      <select name="tag" id="tag">
-		<option value="golang-1.11" selected>Go 1.11</option>
-		<option value="golang-1.10">Go 1.10</option>
-		<option value="golang-1.9">Go 1.9</option>
-		<option value="golang-1.8">Go 1.8</option>
-	      </select>
-	    </div>
-	  </div>
-	  <div class="row">
-	    <input type="submit" value="Go" />
-	    <span id="loading" class="hidden" style="width: 32px; height: 32px; vertical-align: middle;">
-	      <img src="/assets/images/ripple.svg" alt="loading" height="100%" width="100%" title="loading" />
-	    </span>
-	  </div>
-	</form>
-	<section id="coverage" style="display: none;">
-	  <img src="" alt="cover.run badge" class="badge" id="badge" style="vertical-align: middle;" />
-	  <span id="badgeloading" class="hidden" style="width: 32px; height: 32px; vertical-align: middle;">
-	    <img src="/assets/images/ripple.svg" alt="loading" height="100%" width="100%" title="loading" />
-	  </span>
-	  <div>
-	    Add the badge to your markdown file
-	    <p style="overflow-x: auto">
-	      <code id="mdbadge"></code>
-	    </p>
-	    <button class="small copy" data-clipboard-target="#mdbadge">Copy</button>
-	  </div>
-	  <hr />
-	  <h5>Details</h5>
-	  <p id="details"></p>
-	</section>
-      </main>
+  <script src="/assets/js/jquery.min.js"></script>
+  <script src="/assets/js/clipboard.js"></script>
+</head>
+<body>
+  <div class="container wrap">
+    <header class="header">
+      <a href="/" style="color: #3f51b5; font-size: 29px; line-height: 32px; text-decoration: none"><strong>cover.run</strong></a>
+    </header>
 
-      <footer class="footer text-small">
-	cover.run &copy; 2018,
-	<a href="https://github.com/avelino/cover.run" target="blank">GitHub source</a>
-      </footer>
-    </div>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-96762700-1"></script>
-    <script>
-     window.dataLayer = window.dataLayer || [];
-     function gtag() { dataLayer.push(arguments); }
-     gtag('js', new Date());
-     gtag('config', 'UA-96762700-1');
-    </script>
-    <script async src="/assets/js/main.js"></script>
-  </body>
+    <main class="content">
+      <p>Generate test coverage badges for any public Go package</p>
+      <form class="form" method="get" action="/go" id="form">
+        <div class="row">
+          <div class="nine columns">
+            <input type="text" placeholder="eg: github.com/user/project" name="repo" id="repo" />
+          </div>
+          <div class="three columns">
+            <select name="tag" id="tag">
+              {{ range $v := .Versions }}
+              <option value="{{ $v.Tag }}">{{ $v.Name }}</option>
+              {{ end }}
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <input type="submit" value="Go" />
+          <span id="loading" class="hidden" style="width: 32px; height: 32px; vertical-align: middle;">
+            <img src="/assets/images/ripple.svg" alt="loading" height="100%" width="100%" title="loading" />
+          </span>
+        </div>
+      </form>
+      <section id="coverage" style="display: none;">
+        <img src="" alt="cover.run badge" class="badge" id="badge" style="vertical-align: middle;" />
+        <span id="badgeloading" class="hidden" style="width: 32px; height: 32px; vertical-align: middle;">
+          <img src="/assets/images/ripple.svg" alt="loading" height="100%" width="100%" title="loading" />
+        </span>
+        <div>
+          Add the badge to your markdown file
+          <p style="overflow-x: auto">
+            <code id="mdbadge"></code>
+          </p>
+          <button class="small copy" data-clipboard-target="#mdbadge">Copy</button>
+        </div>
+        <hr />
+        <h5>Details</h5>
+        <p id="details"></p>
+      </section>
+    </main>
+
+    <footer class="footer text-small">
+      cover.run &copy; 2018,
+      <a href="https://github.com/avelino/cover.run" target="blank">GitHub source</a>
+    </footer>
+  </div>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-96762700-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'UA-96762700-1');
+  </script>
+  <script async src="/assets/js/main.js"></script>
+
+</body>
 </html>

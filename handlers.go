@@ -19,7 +19,7 @@ func HandlerRepoJSON(w http.ResponseWriter, r *http.Request) {
 	repo := strings.TrimSpace(vars["repo"])
 
 	obj, _ := repoCover(repo, goversion)
-	json.NewEncoder(w).Encode(obj)
+	_ = json.NewEncoder(w).Encode(obj)
 }
 
 // HandlerRepoSVG returns the SVG badge with coverage for a given repository
@@ -36,7 +36,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 		badgeStyle = "flat-square"
 	}
 
-	svg, _ := coverageBadge(repo, tag, badgeStyle)
+	svg := coverageBadge(repo, tag, badgeStyle)
 
 	w.Header().Set("cache-control", "priviate, max-age=0, no-cache")
 	w.Header().Set("pragma", "no-cache")
@@ -44,7 +44,7 @@ func HandlerRepoSVG(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Vary", "Accept-Encoding")
 
-	w.Write([]byte(svg))
+	_, _ = w.Write([]byte(svg))
 }
 
 // HandlerBadge generates a badge with the given value
@@ -59,13 +59,21 @@ func HandlerBadge(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("expires", "-1")
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Vary", "Accept-Encoding")
-	w.Write([]byte(svg))
+
+	_, _ = w.Write([]byte(svg))
+}
+
+type pageData struct {
+	Versions []Version
 }
 
 // Handler returns the homepage
 func Handler(w http.ResponseWriter, r *http.Request) {
-	err := pageTmpl.Execute(w, nil)
-	if err != nil {
+	bind := pageData{
+		Versions: langSupportedVersions,
+	}
+
+	if err := pageTmpl.Execute(w, bind); err != nil {
 		errLogger.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

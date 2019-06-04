@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{{.Width}}" height="20">
+  <g shape-rendering="crispEdges">
+    <path fill="#555" d="M0 0h61v20H0z" />
+    <path fill="{{.Color}}" d="M61 0h57v20H61z" />
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
+    <text x="315" y="140" transform="scale(.1)" textLength="510">{{.Label}}</text>
+    <text x="{{.StatusX}}" y="140" transform="scale(.1)" textLength="">{{.Status}}</text>
+  </g>
+</svg>

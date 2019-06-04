@@ -1,10 +1,16 @@
 language: go
 go:
-  - "master"
-sudo: required
+  - 1.11.x
+  - tip
+
 services:
   - docker
 
-before_install:
-  - cp ./dockers/Golang/run.sh ./dockers/Golang/1.10/run.sh
-  - docker build -t avelino/cover.run:golang-1.10 ./dockers/Golang/1.10
+install:
+  - cp build/docker/golang/run.sh build/docker/golang/1.10/run.sh
+  - docker build -t avelino/cover.run:golang-1.10 ./build/docker/golang/1.10
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - go: tip

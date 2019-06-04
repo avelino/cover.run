@@ -23,6 +23,18 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 )
 
+type Version struct {
+	Tag  string
+	Name string
+}
+
+var langSupportedVersions = []Version{
+	{Tag: "golang-1.11", Name: "Go 1.11"},
+	{Tag: "golang-1.10", Name: "Go 1.10"},
+	{Tag: "golang-1.9", Name: "Go 1.9"},
+	{Tag: "golang-1.8", Name: "Go 1.8"},
+}
+
 const (
 	// coverQMax is the maximum number of coverage run to be executed simultaneously
 	coverQMax = 5
@@ -36,11 +48,6 @@ const (
 	// DefaultTag is the Go version to run the tests with when no version
 	// is specified
 	DefaultTag = "1.10"
-	// cacheExpiry is the duration in which the cache will be expired
-	cacheExpiry = time.Hour
-	// refreshWindows is the time duration, in which if the cache is about to expire
-	// cover run is started again.
-	refreshWindow = time.Minute * 10
 
 	// Redis Errors
 	redisErrNil      = "redis: nil"
@@ -54,7 +61,7 @@ var (
 	// qLock is used to push to Redis channel because redis pub-sub in go-redis is
 	// not concurrency safe
 	qLock = sync.Mutex{}
-	// qChan is used to control the number of simultaneos executions
+	// qChan is used to control the number of simultaneous executions
 	qChan = make(chan struct{}, coverQMax)
 
 	httpClient = &http.Client{
@@ -107,11 +114,10 @@ var (
 
 // langVersionSupported returns true if the given Go version is supported
 func langVersionSupported(version string) bool {
-	switch version {
-	case "golang-1.10",
-		"golang-1.9",
-		"golang-1.8":
-		return true
+	for _, v := range langSupportedVersions {
+		if v.Tag == version {
+			return true
+		}
 	}
 	return false
 }
@@ -249,7 +255,9 @@ func computeCoverage(stdOut string) string {
 // - Before starting evaluation, it sets the repo's status as in progress
 // - Removes the inprogress status of a repo after it's done
 func cover(repo, langVersion string) error {
-	setInProgress(repo, langVersion)
+	if err := setInProgress(repo, langVersion); err != nil {
+		return err
+	}
 
 	stdOut, stdErr, err := run(langVersion, repo)
 	if err != nil {
@@ -259,7 +267,9 @@ func cover(repo, langVersion string) error {
 		}
 	}
 
-	unsetInProgress(repo, langVersion)
+	if err := unsetInProgress(repo, langVersion); err != nil {
+		return err
+	}
 
 	obj := &Object{
 		Repo:   repo,
@@ -342,28 +352,6 @@ type Repository struct {
 	Cover string
 }
 
-func repoLatest() ([]*Repository, error) {
-	repos := make([]*Repository, 0)
-	keys, _, err := redisRing.Scan(0, "*", 10).Result()
-	if err != nil {
-		errLogger.Println(err)
-		return repos, err
-	}
-
-	var obj Object
-	for _, key := range keys {
-		if len(repos) == 5 {
-			return repos, nil
-		}
-		if err := redisCodec.Get(key, &obj); err == nil {
-			if obj.Output {
-				repos = append(repos, &Repository{obj.Repo, obj.Tag, obj.Cover})
-			}
-		}
-	}
-	return repos, nil
-}
-
 // subscribe subscribes to the Redis channel
 func subscribe(qname string) {
 	pubsub := redisClient.Subscribe(qname)
@@ -376,7 +364,9 @@ func subscribe(qname string) {
 		}
 		repo, tag := repoTagFromFullName(msg.Payload)
 		qChan <- struct{}{}
-		go cover(repo, tag)
+		go func() {
+			_ = cover(repo, tag)
+		}()
 	}
 }
 
